@@ -17,7 +17,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from .llm import generate_json
+from .llm import generate_json, resolve_model
 from .segment_llm import MergedLine
 
 # User-validated operating point: 1000 subtitle lines per call;
@@ -126,7 +126,7 @@ def translate_lines(
     glossary_path: Path | None = None,
 ) -> list[str]:
     system = _load_system(glossary_path)
-    model = os.environ.get("TRANSLATE_MODEL", "gemini-2.5-pro")
+    model = resolve_model("TRANSLATE_MODEL")
     translations: dict[int, str] = {}
     if cache_dir:
         cache_dir.mkdir(parents=True, exist_ok=True)

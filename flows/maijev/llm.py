@@ -18,6 +18,10 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+# 2.5-pro is being retired (Oct 2026); switch this to "gemini-3.8-flash"
+# when that happens — 3.x models take thinkingLevel, not thinkingBudget.
+DEFAULT_MODEL = "gemini-2.5-pro"
+
 DEFAULT_BASE_URL = (
     "https://aiplatform.googleapis.com/v1beta1/publishers/google/models"
 )
@@ -71,7 +75,7 @@ def generate(
             json_mode=json_mode, timeout=timeout, api_key=openrouter_key,
         )
 
-    model = model or os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    model = model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
     body: dict[str, Any] = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -84,6 +88,13 @@ def generate(
         body["systemInstruction"] = {"parts": [{"text": system}]}
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
+    # Gemini 3.x models use thinkingLevel (LOW/MEDIUM/HIGH) instead of the
+    # 2.x thinkingBudget field; only sent when explicitly configured.
+    thinking_level = os.environ.get("LLM_THINKING_LEVEL", "").strip()
+    if thinking_level:
+        body["generationConfig"]["thinkingConfig"] = {
+            "thinkingLevel": thinking_level.upper()
+        }
 
     studio_key = os.environ.get("GEMINI_API_KEY")
     api_key = os.environ.get("GEMINI_AGENT_PLATFORM_API_KEY") or os.environ.get(
@@ -126,6 +137,15 @@ def generate(
         prompt_tokens=usage.get("promptTokenCount", 0),
         output_tokens=usage.get("candidatesTokenCount", 0),
     )
+
+def resolve_model(stage_env: str) -> str:
+    """Model for one stage: stage env > GEMINI_MODEL > DEFAULT_MODEL."""
+    return (
+        os.environ.get(stage_env)
+        or os.environ.get("GEMINI_MODEL")
+        or DEFAULT_MODEL
+    )
+
 
 def _generate_openrouter(
     prompt: str,

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -278,7 +279,15 @@ def main() -> None:
         help="run the shared glossary pre-pass on subtitle text alone "
         "(no OCR input; requires --translate)",
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Gemini model for all LLM stages (same as GEMINI_MODEL; "
+        "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
+    )
     args = parser.parse_args()
+    if args.model:
+        os.environ["GEMINI_MODEL"] = args.model
     run(
         args.input,
         args.work_dir,
