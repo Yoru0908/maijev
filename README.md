@@ -1,6 +1,6 @@
 # maijev
 
-[项目介绍页](docs/index.html)：白底流程图、早期字幕工作流的工程化演进，以及与 GrillMaster 的设计取舍对比。下载仓库后可直接用浏览器打开。
+[项目介绍演示](docs/index.html)：12 页白底 16:9 幻灯片，包含 ASCII 流程图、早期字幕工作流的工程化演进，以及与 GrillMaster 的设计取舍对比。下载仓库后可直接用浏览器打开，支持左右键、翻页按钮、页码跳转、全屏及打印为 PDF。偏好连续阅读可打开[完整阅读版](docs/overview.html)。
 
 `maijev` 是一条面向长视频的日语字幕流水线：
 
@@ -729,7 +729,9 @@ maijev/
 │   └── gui/                    # 可选 Web GUI（FastAPI + 单页）
 │       ├── server.py           #   子进程 + SSE + work_dir 文件暴露
 │       └── static/             #   index.html / app.js
-├── docs/                       # 介绍首页 index.html / 旧入口 intro.html 自动跳转 / 技术说明 tech.html
+├── docs/                       # 幻灯片 index.html / 阅读版 overview.html / 技术说明 tech.html
+│   ├── deck-stage.js           # 本地幻灯片组件（MIT），无外部依赖
+│   └── intro.html             # 兼容旧入口，自动跳转到演示
 ├── services/
 ├── tests/                      # 纯函数测试（不调 LLM/ffmpeg）
 ├── pyproject.toml

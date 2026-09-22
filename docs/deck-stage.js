@@ -706,7 +706,8 @@
       // windowed margin/shadow, see _fit. A bare load with no #N hash starts at
       // slide 1, so ?thumbnail=1 alone yields a clean first-slide frame.
       this._snthumb = /[?&](_snthumb|thumbnail)=/.test(location.search);
-      this._mobile = isMobileUA();
+      // Local option: keep a single paged slide on mobile instead of a card stream.
+      this._mobile = isMobileUA() && !this.hasAttribute('paged-mobile');
       this._syncMobileMode();
       if (this._snthumb) this.setAttribute('no-rail', '');
       this._render();
@@ -1665,8 +1666,9 @@
       }
       // The notes dock spans the non-rail width; its left edge tracks the rail.
       if (this._notesPanel) this._notesPanel.style.left = (rw + DECK_MARGIN) + 'px';
-      const vw = window.innerWidth - rw - 2 * m;
-      const vh = window.innerHeight - nh - 2 * m;
+      // Fit the host, allowing the document to reserve space for its toolbar.
+      const vw = this.clientWidth - rw - 2 * m;
+      const vh = this.clientHeight - nh - 2 * m;
       const s = Math.min(vw / this.designWidth, vh / this.designHeight);
       this._canvas.style.transform = `scale(${s})`;
     }
