@@ -3,38 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>maijev · P2 技术原理</title>
+<title>maijev — 技术原理</title>
 <style>
   :root {
-    --bg: #f8fafc;
-    --fg: #1e293b;
-    --dim: #64748b;
-    --line: #e2e8f0;
-    --primary: #3b82f6;
-    --accent: #f97316;
-    --violet: #8b5cf6;
+    --bg: #ffffff;
+    --fg: #202923;
+    --dim: #69736c;
+    --line: #dfe5df;
+    --primary: #326744;
+    --accent: #326744;
     --card: #ffffff;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  a:focus-visible { outline: 3px solid var(--primary); outline-offset: 5px; }
+  ::selection { background: #d9ead9; }
   body {
     background: var(--bg);
     color: var(--fg);
-    font-family: Inter, -apple-system, "SF Pro", "PingFang SC",
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
       "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     overflow-x: hidden;
     line-height: 1.6;
   }
-  #bg3d { position: fixed; inset: 0; z-index: 0; }
-  main { position: relative; z-index: 2; }
+  main { width: min(1120px, calc(100% - 64px)); margin: auto; }
   section {
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 12vh 8vw;
+    align-items: flex-start;
+    padding: 64px 0;
+    border-bottom: 1px solid var(--line);
   }
+  .hero { padding: 80px 0 55px; }
 
   .hero .p2 {
     font-family: ui-monospace, monospace;
@@ -44,21 +43,15 @@
     margin-bottom: 18px;
   }
   .hero h1 {
-    font-size: clamp(44px, 8vw, 100px);
-    font-weight: 800;
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 650;
     letter-spacing: -0.02em;
   }
   .hero .sub { margin-top: 18px; color: var(--dim); font-size: clamp(16px, 2.2vw, 24px); }
   .back { margin-top: 34px; font-size: 14px; color: var(--primary); text-decoration: none; }
-  .scroll-hint {
-    position: absolute; bottom: 5vh;
-    color: var(--dim); font-size: 13px; letter-spacing: .3em;
-    animation: bob 2s ease-in-out infinite;
-  }
-  @keyframes bob { 50% { transform: translateY(8px); opacity: .4; } }
 
   h2 {
-    font-size: clamp(26px, 3.6vw, 42px);
+    font-size: clamp(25px, 3vw, 32px);
     font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: 3.5vh;
@@ -155,9 +148,8 @@
     padding: 20px 24px;
     box-shadow: 0 8px 30px -12px rgba(30,41,59,.14);
     text-decoration: none; color: inherit;
-    transition: border-color .25s, transform .25s;
   }
-  .why:hover { border-color: #bfdbfe; transform: translateY(-2px); }
+  .why:hover { border-color: var(--primary); }
   .why img { width: 240px; border-radius: 10px; flex: none; border: 1px solid var(--line); }
   .why .t1 { font-size: 17px; font-weight: 600; }
   .why .t2 { color: var(--dim); font-size: 14px; margin-top: 6px; }
@@ -174,21 +166,31 @@
     box-shadow: 0 12px 40px -12px rgba(59,130,246,.3);
   }
 
+  .duo figure, .rulebox, .flow, .card, .why, .final .repo-big {
+    border-radius: 5px;
+    box-shadow: none;
+    min-width: 0;
+  }
+  .flow { background: #f5f7f4; overflow-wrap: anywhere; }
+  .final .repo-big { border-color: var(--line); padding: 14px 20px; overflow-wrap: anywhere; }
+  .cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
   @media (max-width: 720px) {
+    main { width: calc(100% - 36px); }
+    section { padding: 42px 0; }
+    .hero { padding-top: 45px; }
     .duo, .why { flex-direction: column; }
     .why img { width: 100%; }
+    .flow { padding: 20px; }
   }
 </style>
 </head>
 <body>
-<canvas id="bg3d"></canvas>
 <main>
   <section class="hero">
-    <div class="p2">P2 · TECHNICAL DEEP-DIVE</div>
+    <div class="p2">MAIJEV / TECHNICAL NOTES</div>
     <h1>技术<span style="color:var(--primary)">原理</span></h1>
     <div class="sub">时间轴归程序 · 语义归 LLM · 译名归共享词库</div>
-    <a class="back" href="intro.html">← 回到 P1 项目介绍</a>
-    <div class="scroll-hint">SCROLL ▾</div>
+    <a class="back" href="index.html">← 回到项目介绍</a>
   </section>
 
   <section>
@@ -228,8 +230,8 @@
     <a class="why" href="https://www.bilibili.com/video/BV1tFhCzcEUA/" target="_blank" rel="noopener">
       <img src="assets/subtitle-workflow-video.png" alt="AI 字幕工作流思路视频">
       <div>
-        <div class="t1">这套合并逻辑的完整思路讲解</div>
-        <div class="t2">一小时 300 行的字幕工作流实操版——为什么断句交给模型、时间轴握在程序手里。</div>
+        <div class="t1">早期探索：2025 年的 AI 字幕工作流</div>
+        <div class="t2">CapCut 转录、LLM 合并与翻译、人工校对的实践。视频中的 300 行 / 小时指人工做档效率；程序管理时间轴是本项目后续的工程化选择。</div>
         <div class="t3">bilibili.com/video/BV1tFhCzcEUA ↗</div>
       </div>
     </a>
@@ -249,7 +251,7 @@
 —— 与外部词库 TRANSLATE_GLOSSARY_PATH 同格式、可叠加</div>
     <div class="cards" style="margin-top:24px">
       <div class="card"><div class="step">ANCHOR 来源</div><h3>三路任选</h3><p>Jev 筛出的实体 · 无凭据时 OCR 原文 · TVer/Abema cast 权威人名（绕过分类直进）。</p></div>
-      <div class="card"><div class="step">对比 grillmaster</div><h3>省掉多模态</h3><p>pre-pass 输入从 ~140k token（图+音+文）降到 ~20k 纯文本，约 7 倍差距。</p></div>
+      <div class="card"><div class="step">对比 grillmaster</div><h3>选择纯文本输入</h3><p>不向 pre-pass 发送图片与音频，减少媒体输入；代价是不能直接理解语气与动作。具体 token 差异取决于素材和采样配置。</p></div>
       <div class="card"><div class="step">MERGE 隔离</div><h3>零上下文污染</h3><p>断句不接收任何 OCR/词库内容，merge 缓存不随支线变化失效。</p></div>
     </div>
   </section>
@@ -266,10 +268,8 @@
 
   <section class="final">
     <div class="repo-big">github.com/Yoru0908/maijev</div>
-    <p style="margin-top:26px;color:var(--dim);font-size:14px"><a href="intro.html" style="color:var(--primary)">← P1 项目介绍</a></p>
+    <p style="margin-top:26px;color:var(--dim);font-size:14px"><a href="index.html" style="color:var(--primary)">← 项目介绍</a></p>
   </section>
 </main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="intro.js"></script>
 </body>
 </html>
