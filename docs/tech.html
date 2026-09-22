@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>maijev · P2 技术原理</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --fg: #1e293b;
+    --dim: #64748b;
+    --line: #e2e8f0;
+    --primary: #3b82f6;
+    --accent: #f97316;
+    --violet: #8b5cf6;
+    --card: #ffffff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: Inter, -apple-system, "SF Pro", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    overflow-x: hidden;
+    line-height: 1.6;
+  }
+  #bg3d { position: fixed; inset: 0; z-index: 0; }
+  main { position: relative; z-index: 2; }
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12vh 8vw;
+  }
+
+  .hero .p2 {
+    font-family: ui-monospace, monospace;
+    color: var(--accent);
+    letter-spacing: .3em;
+    font-size: 15px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(44px, 8vw, 100px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .hero .sub { margin-top: 18px; color: var(--dim); font-size: clamp(16px, 2.2vw, 24px); }
+  .back { margin-top: 34px; font-size: 14px; color: var(--primary); text-decoration: none; }
+  .scroll-hint {
+    position: absolute; bottom: 5vh;
+    color: var(--dim); font-size: 13px; letter-spacing: .3em;
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(8px); opacity: .4; } }
+
+  h2 {
+    font-size: clamp(26px, 3.6vw, 42px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 3.5vh;
+    align-self: flex-start;
+    max-width: 1150px;
+    width: 100%;
+  }
+  h2 .accent { color: var(--primary); }
+  .lede {
+    align-self: flex-start;
+    max-width: 760px;
+    color: var(--dim);
+    font-size: 16px;
+    margin-bottom: 4vh;
+  }
+
+  .duo {
+    display: flex; gap: 22px; width: 100%; max-width: 1150px;
+    align-items: stretch;
+  }
+  .duo figure {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px -16px rgba(30,41,59,.2);
+  }
+  .duo img { width: 100%; display: block; }
+  .duo figcaption { padding: 12px 18px; font-size: 13.5px; color: var(--dim); border-top: 1px solid var(--line); }
+  .duo figcaption b { color: var(--fg); }
+
+  .rulebox {
+    margin-top: 26px;
+    width: 100%; max-width: 1150px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 26px;
+    box-shadow: 0 8px 30px -12px rgba(30,41,59,.14);
+  }
+  .rulebox .cap { font-size: 12.5px; letter-spacing: .18em; color: var(--accent); font-weight: 700; margin-bottom: 12px; }
+  .rulebox ul { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 26px; }
+  .rulebox li { color: var(--dim); font-size: 14.5px; }
+  .rulebox li::before { content: "·"; color: var(--primary); font-weight: 800; margin-right: 8px; }
+  .rulebox code { color: var(--accent); font-size: 13px; }
+
+  .flow {
+    width: 100%; max-width: 1150px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px 28px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--dim);
+    white-space: pre-wrap;
+    box-shadow: 0 8px 30px -12px rgba(30,41,59,.14);
+  }
+  .flow b { color: var(--fg); font-weight: 600; }
+  .flow .hl { color: var(--primary); }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    width: 100%;
+    max-width: 1150px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px 22px;
+    box-shadow: 0 8px 30px -12px rgba(30,41,59,.14);
+  }
+  .card .step {
+    font-family: ui-monospace, monospace;
+    font-size: 12px; color: var(--accent);
+    letter-spacing: .18em; margin-bottom: 10px; font-weight: 600;
+  }
+  .card h3 { font-size: 18px; margin-bottom: 8px; }
+  .card p { font-size: 14px; line-height: 1.7; color: var(--dim); }
+  .card code { color: var(--accent); font-size: 12.5px; }
+
+  .why {
+    margin-top: 28px;
+    width: 100%; max-width: 1150px;
+    display: flex; gap: 26px; align-items: center;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 8px 30px -12px rgba(30,41,59,.14);
+    text-decoration: none; color: inherit;
+    transition: border-color .25s, transform .25s;
+  }
+  .why:hover { border-color: #bfdbfe; transform: translateY(-2px); }
+  .why img { width: 240px; border-radius: 10px; flex: none; border: 1px solid var(--line); }
+  .why .t1 { font-size: 17px; font-weight: 600; }
+  .why .t2 { color: var(--dim); font-size: 14px; margin-top: 6px; }
+  .why .t3 { color: var(--primary); font-size: 13px; margin-top: 10px; font-family: ui-monospace, monospace; }
+
+  .final .repo-big {
+    font-family: ui-monospace, monospace;
+    font-size: clamp(16px, 2.4vw, 24px);
+    color: var(--primary);
+    background: var(--card);
+    border: 1.5px solid #bfdbfe;
+    border-radius: 999px;
+    padding: 14px 38px;
+    box-shadow: 0 12px 40px -12px rgba(59,130,246,.3);
+  }
+
+  @media (max-width: 720px) {
+    .duo, .why { flex-direction: column; }
+    .why img { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<canvas id="bg3d"></canvas>
+<main>
+  <section class="hero">
+    <div class="p2">P2 · TECHNICAL DEEP-DIVE</div>
+    <h1>技术<span style="color:var(--primary)">原理</span></h1>
+    <div class="sub">时间轴归程序 · 语义归 LLM · 译名归共享词库</div>
+    <a class="back" href="intro.html">← 回到 P1 项目介绍</a>
+    <div class="scroll-hint">SCROLL ▾</div>
+  </section>
+
+  <section>
+    <h2>为什么需要 <span class="accent">atom</span> 这一层</h2>
+    <div class="lede">ASR 给两种粒度，都不够用：utterance 太粗（一段好几句话），word 太细（一个假名一行）。字幕需要的是中间层。</div>
+    <div class="duo">
+      <figure>
+        <img src="assets/asr-utterance.png" alt="ASR utterance 级输出">
+        <figcaption><b>Utterance 级</b> · 一个 segment 装下连续几句话，还带重复——直接当字幕太长，直接断又不知道断在哪。</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/asr-words.png" alt="ASR word 级输出">
+        <figcaption><b>Word 级</b> · 每个假名/单词都有精确起止和 speaker——信息最全，但粒度太碎，没法直接翻译。</figcaption>
+      </figure>
+    </div>
+    <div class="rulebox">
+      <div class="cap">build_atoms() · 纯代码、零模型</div>
+      <ul>
+        <li>speaker 切换必断</li>
+        <li>词间静音 ≥ 1s 必断</li>
+        <li>硬标点 <code>。！？</code> 必断，软标点 <code>、，：；</code> 可断</li>
+        <li>单 atom 超 48 字时长度兜底</li>
+        <li>短促相槌（うん / ええ…）由程序预处理，不进 merge</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="accent">Merge</span> — LLM 只回答一个问题</h2>
+    <div class="lede">输入是带序号的 atom 列表（含一小段上下文尾部），输出是「哪几个相邻 atom 合成一行」的分组。行数、时间戳、speaker 都不由模型产生。</div>
+    <div class="flow"><b>发给模型：</b>
+  12 | s0 | +0.42s | まだわかんない。
+  13 | s0 | +1.10s | まだわかんないよね？   (context)
+<b>模型只回：</b> {"groups": [[12]]}
+<b>程序做：</b> 校验分组连续、不跨长静音、不越批 → 拼装字幕行
+<b>缓存键：</b> atom 内容 hash + system prompt + model —— 改任何一个自动失效</div>
+    <a class="why" href="https://www.bilibili.com/video/BV1tFhCzcEUA/" target="_blank" rel="noopener">
+      <img src="assets/subtitle-workflow-video.png" alt="AI 字幕工作流思路视频">
+      <div>
+        <div class="t1">这套合并逻辑的完整思路讲解</div>
+        <div class="t2">一小时 300 行的字幕工作流实操版——为什么断句交给模型、时间轴握在程序手里。</div>
+        <div class="t3">bilibili.com/video/BV1tFhCzcEUA ↗</div>
+      </div>
+    </a>
+  </section>
+
+  <section>
+    <h2><span class="accent">Pre-pass</span> — 一次调用，全片共享的词库</h2>
+    <div class="lede">不再给模型发图片和音频：OCR 已经把画面文字变成文本，pre-pass 只做纯文本推理。</div>
+    <div class="flow"><b>输入：</b>
+  【画面文字】OCR anchor（Jev 筛过 / 原文直进 / cast 名单）
+  【日文字幕行】merge 后的全部字幕文本
+<b>一次 Gemini 调用 → prepass_cache/ 存 JSON → render_glossary() 摊平：</b>
+  山川さん <span class="hl">-&gt;</span> 山川宇衣
+  とみこさん <span class="hl">-&gt;</span> 目黒富子
+  ねこがみ <span class="hl">-&gt;</span> 猫神
+<b>去向：</b>glossary.md 注入每一个翻译批次的 system prompt
+—— 与外部词库 TRANSLATE_GLOSSARY_PATH 同格式、可叠加</div>
+    <div class="cards" style="margin-top:24px">
+      <div class="card"><div class="step">ANCHOR 来源</div><h3>三路任选</h3><p>Jev 筛出的实体 · 无凭据时 OCR 原文 · TVer/Abema cast 权威人名（绕过分类直进）。</p></div>
+      <div class="card"><div class="step">对比 grillmaster</div><h3>省掉多模态</h3><p>pre-pass 输入从 ~140k token（图+音+文）降到 ~20k 纯文本，约 7 倍差距。</p></div>
+      <div class="card"><div class="step">MERGE 隔离</div><h3>零上下文污染</h3><p>断句不接收任何 OCR/词库内容，merge 缓存不随支线变化失效。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="accent">Translate</span> — 契约与兜底</h2>
+    <div class="cards">
+      <div class="card"><div class="step">JSON 契约</div><h3>按 id 对齐</h3><p>模型只回 <code>{"id": n, "zh": "…"}</code>，程序校验、写回对应行；speaker 分隔符 <code>" -"</code> 由程序预插、模型只保留。</p></div>
+      <div class="card"><div class="step">二分重试</div><h3>缺行不对齐</h3><p>漏了 id 就把批次对半切开重试；失败批次不进 <code>zh_cache/</code>，重跑只补缺口。</p></div>
+      <div class="card"><div class="step">模型可选</div><h3>按阶段覆盖</h3><p><code>SEGMENT_MODEL</code> / <code>TRANSLATE_MODEL</code> / <code>PREPASS_MODEL</code> → <code>GEMINI_MODEL</code> → 默认。3.x 用 <code>LLM_THINKING_LEVEL</code>。</p></div>
+      <div class="card"><div class="step">远程来源</div><h3>yt-dlp 前置</h3><p>BV / ep / Abema / YouTube ID 或 URL 直接当 input；TVer/Abema 额外抓出演者名单喂 pre-pass。</p></div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="repo-big">github.com/Yoru0908/maijev</div>
+    <p style="margin-top:26px;color:var(--dim);font-size:14px"><a href="intro.html" style="color:var(--primary)">← P1 项目介绍</a></p>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="intro.js"></script>
+</body>
+</html>
