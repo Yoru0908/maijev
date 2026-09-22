@@ -35,7 +35,9 @@ from .llm import generate_json, resolve_model
 
 # Atoms per LLM call, plus trailing context shown but not decided.
 # 1000 atoms ≈ 30min of audio — one call per half hour, two calls for 1h.
-BATCH_SIZE = 1000
+# Bounded by the model's output cap, not its context window; tune via env
+# when switching models.
+BATCH_SIZE = int(os.environ.get("SEGMENT_BATCH_SIZE", "1000"))
 CONTEXT_TAIL = 20
 # Independent batches run in parallel; each is a single LLM call.
 MAX_WORKERS = 2
