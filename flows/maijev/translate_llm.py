@@ -22,7 +22,9 @@ from .segment_llm import MergedLine
 
 # User-validated operating point: 1000 subtitle lines per call;
 # two 1000-line batches can run in parallel for longer recordings.
-BATCH_SIZE = 1000
+# Bounded by the model's output cap (~30k tokens of zh JSON per 1000
+# lines), not its context window; tune via env when switching models.
+BATCH_SIZE = int(os.environ.get("TRANSLATE_BATCH_SIZE", "1000"))
 MAX_WORKERS = 2
 
 PROMPT_PATH = Path(__file__).parent / "translate_prompt.md"
