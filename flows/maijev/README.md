@@ -131,7 +131,7 @@ id<TAB>日文字幕
 程序按 id 对回原始 `MergedLine` 的 `start`、`end`，再生成 `out_zh.srt`。时间戳不
 发送给翻译模型，也不由模型生成。
 
-翻译默认每批 1000 行，最大输出 token 默认 65000，可通过
+翻译默认每批 1000 行，最大输出 token 默认 65536，可通过
 `LLM_MAX_OUTPUT_TOKENS` 覆盖。术语一致性有两个来源，注入到同一个【术语表】
 段落：`TRANSLATE_GLOSSARY_PATH` 指向仓库外的人工术语表（冲突时优先），以及
 `glossary.md`——`--ocr-json` 或 `--prepass` 时由 `prepass.py` 对全片做一次

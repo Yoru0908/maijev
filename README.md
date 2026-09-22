@@ -79,7 +79,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `GEMINI_MODEL` | 全局 Gemini 模型默认值 |
 | `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
-| `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65000` |
+| `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
 
@@ -441,7 +441,7 @@ MergedLine.start + MergedLine.end + translated zh
 ```text
 BATCH_SIZE = 1000 lines
 MAX_WORKERS = 2
-maxOutputTokens = 65000
+maxOutputTokens = 65536
 ```
 
 确定性后处理包括：
@@ -546,7 +546,7 @@ cat runs/example/timings.json
 - speaker 编号只保证在单个 ASR 请求范围内有效；跨 chunk 不保证同一个人继续使用
   同一个编号。严格的全片 speaker identity 需要额外的全局 diarization 或 speaker
   embedding。
-- LLM 的响应速度和最大输出长度取决于具体模型和后端；`65000` 是配置上限，不
+- LLM 的响应速度和最大输出长度取决于具体模型和后端；`65536` 是配置上限，不
   代表每次调用一定生成这么多 token。
 - phrase list 需要调用方按领域自行传入，不由仓库维护。
 
