@@ -46,7 +46,7 @@ from .frames import prepare_reference_frames  # noqa: E402
 
 
 def run(
-    input_path: Path,
+    input_path: Path | str,
     work_dir: Path,
     srt_path: Path | None = None,
     phrases: list[str] | None = None,
@@ -59,6 +59,34 @@ def run(
     work_dir.mkdir(parents=True, exist_ok=True)
     run_t0 = time.perf_counter()
     timings: dict[str, float] = {}
+
+    # 0. resolve input: a missing local path is treated as a remote source
+    #    (Bilibili BV… / TVer ep… / Abema 90-…_s…_p… / YouTube v=… or URL)
+    #    and downloaded via yt-dlp; TVer/Abema cast metadata is collected
+    #    here for the pre-pass.
+    input_path = Path(input_path)
+    talents: list[str] = []
+    if not input_path.exists():
+        from .source import download_video, fetch_talents, resolve_source
+
+        source = resolve_source(str(input_path))
+        dl_t0 = time.perf_counter()
+        input_path = download_video(source, work_dir / "download")
+        timings["download_seconds"] = time.perf_counter() - dl_t0
+        talents = fetch_talents(source)
+        (work_dir / "source_meta.json").write_text(
+            json.dumps(
+                {
+                    "video_id": source.video_id,
+                    "platform": source.platform,
+                    "url": source.url,
+                    "talents": talents,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
     wav_path = work_dir / "audio.wav"
     asr_path = work_dir / "asr.json"
     srt_path = srt_path or work_dir / "out.srt"
@@ -176,13 +204,20 @@ def run(
             # Shared text-only pre-pass: JEV-filtered OCR anchors + merged
             # lines -> glossary.md, injected into every translate batch.
             glossary_path = work_dir / "glossary.md"
-            if ocr_json is not None or prepass:
+            if ocr_json is not None or prepass or talents:
+                # Cast names from source metadata are authoritative person
+                # anchors — they bypass JEV and go straight to the pre-pass.
+                cast_anchors = [
+                    {"text": t, "kind": "person_name", "source": "cast"}
+                    for t in talents
+                ]
                 prepass_t0 = time.perf_counter()
                 glossary_path.write_text(
                     run_prepass(
                         ocr_items,
                         jev_results,
                         lines,
+                        extra_anchors=cast_anchors,
                         cache_dir=work_dir / "prepass_cache",
                     )
                     + "\n",
@@ -214,7 +249,11 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="MAI-Transcribe-2 → SRT")
-    parser.add_argument("input", type=Path, help="video or audio file")
+    parser.add_argument(
+        "input",
+        help="local media file, or a remote source: Bilibili BV… / TVer "
+        "ep… / Abema 90-…_s…_p… / YouTube v=… or a full URL",
+    )
     parser.add_argument("work_dir", type=Path, help="working/output directory")
     parser.add_argument("--srt", type=Path, default=None, help="SRT output path")
     parser.add_argument("--llm-segment", action="store_true",

@@ -5,7 +5,8 @@
 ```text
 主干（每次运行都执行）：
 
-  视频/音频
+  视频/音频（本地文件，或 BV… / ep… / 90-… / v=… 等远程来源 ID 与 URL）
+    → （远程来源先经 yt-dlp 下载）
     → ffmpeg 抽取音频
     → MAI-Transcribe-2 词级 ASR
     → 静音、标点、speaker 边界拆 atom
@@ -166,6 +167,29 @@ runs/example/out_llm_ja.srt
 runs/example/out_zh.srt
 ```
 
+### 远程来源（yt-dlp）
+
+`input` 也可以是平台视频 ID 或完整 URL，经 yt-dlp 下载后继续同一流水线：
+
+| 平台 | 示例 |
+|---|---|
+| Bilibili | `BV1ZArvBaEqL` / `https://www.bilibili.com/video/BV1ZArvBaEqL` |
+| TVer | `ep12345` / `https://tver.jp/episodes/ep12345` |
+| Abema | `90-979_s1_p123` / `https://abema.tv/video/episode/90-979_s1_p123` |
+| YouTube | `v=dQw4w9WgXcQ` / `https://youtu.be/dQw4w9WgXcQ` |
+
+```bash
+uv run python -m flows.maijev.pipeline \
+  BV1ZArvBaEqL \
+  runs/example \
+  --translate
+```
+
+视频下载到 `runs/example/download/`，来源信息写入 `source_meta.json`。
+TVer / Abema 来源还会额外抓取出演者（cast）元数据，作为**权威人名锚点**
+直接进 pre-pass（绕过 Jev 分类）——只要流水线检测到 cast 数据，即使没有
+`--ocr-json` / `--prepass` 也会自动跑一次 pre-pass 生成词库。
+
 ### 可选：视觉上下文支线（OCR → pre-pass → 自动词库）
 
 整条支线是可选的，而且**逐层降级**——有什么凭据就走哪一层：
@@ -282,6 +306,20 @@ uv run python -m flows.maijev.pipeline \
 输入可以是视频或音频，实际音频格式由 ffmpeg 读取。建议每个输入文件使用独立的
 工作目录。
 
+## 费用估算
+
+一次 26.5 分钟综艺视频的实测数据（`gemini-2.5-pro`，完整链路含 pre-pass）：
+
+| 阶段 | 用时 | 费用 |
+|---|---:|---:|
+| ASR（MAI-Transcribe-2，OpenRouter） | ~30s | $0.044（精确值） |
+| merge + pre-pass + translate（Gemini） | ~11min | ~$0.2（按 token 估算） |
+| **合计** | **~12min** | **≈ $0.25** |
+
+粗略换算：**一小时视频 ≈ $0.5–0.6**。LLM 部分是估算值（usage 未逐项落盘）；
+换 `gemini-2.5-flash` 会更便宜，换更新的 Pro 会更贵。`timings.json` 记录各
+阶段耗时供复盘。
+
 ## 工作目录和缓存
 
 完整运行后的目录结构：
@@ -296,6 +334,8 @@ work_dir/
 │   └── ...
 ├── asr.json                  # 合并后的统一 ASR payload
 ├── out.srt                   # 确定性基线 SRT
+├── download/                 # yt-dlp 下载的远程视频（远程来源时）
+├── source_meta.json          # 来源平台 / ID / URL / cast 名单（远程来源时）
 ├── reference_frames/         # 稀疏代表帧 + manifest（--extract-frames，可选）
 ├── jev_cache/                # Jev OCR 分类的 per-batch JSON 缓存（可选）
 ├── ocr_classification.json   # Jev 分类结果（可选）
@@ -364,16 +404,22 @@ ASR 对 429、500、502、503、504 等临时错误自动退避重试，成功�
 
 `--ocr-json` 阶段只读取外部 OCR observation，并把每个 observation 放进 Jev
 `state.items`，通过 `choice` 问题分类为人名、节目名、地点/品牌、普通对白、效果
-文字、噪声或未知。分类响应按完整请求体 hash 缓存到 `jev_cache/`。
+文字、噪声或未知。分类响应按完整请求体 hash 缓存到 `jev_cache/`。Jev 后端
+二选一：官方 TypeSafe API（`TYPESAFE_API_KEY`）或 Cloudflare Workers AI
+（`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`）。
 
-随后 `prepass.run_prepass()` 把 JEV 筛出的 anchor（`jev.select_anchors` 筛选：
-高置信度实体 + 低置信度待复核项）与 merge 产出的全部日文行一起发给 Gemini
-做**一次共享的纯文本调用**，产出 `glossary.md` 自动词库（`原文 -> 写法`，与
-`TRANSLATE_GLOSSARY_PATH` 同格式）。这个词库——而不是原始 OCR 文字——注入每个
-翻译批次，所以全片译名一致。
+随后 `prepass.run_prepass()` 把 anchor 与 merge 产出的全部日文行一起发给
+Gemini 做**一次共享的纯文本调用**，产出 `glossary.md` 自动词库
+（`原文 -> 写法`，与 `TRANSLATE_GLOSSARY_PATH` 同格式）。anchor 来源可以是：
 
-字幕合并阶段不接收 OCR 内容。没有 `--ocr-json` 时 Jev 和 pre-pass 都不会被
-调用；`--prepass` 可在无 OCR 时单独启用 pre-pass。
+- Jev 筛出的 OCR 实体（有凭据时）；
+- 未筛选的 OCR 原文（无 Jev 凭据时）；
+- 远程来源的 cast 名单（TVer/Abema，权威人名，绕过 Jev 直进）。
+
+这个词库——而不是原始 OCR 文字——注入每个翻译批次，所以全片译名一致。
+
+字幕合并阶段不接收 OCR 内容。没有 `--ocr-json`、没有 cast 数据也没有
+`--prepass` 时，Jev 和 pre-pass 都不会被调用。
 
 
 ### 3. Atom 拆分
