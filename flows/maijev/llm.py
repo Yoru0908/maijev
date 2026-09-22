@@ -76,7 +76,7 @@ def generate(
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "maxOutputTokens": int(
-                os.environ.get("LLM_MAX_OUTPUT_TOKENS", "65000")
+                os.environ.get("LLM_MAX_OUTPUT_TOKENS", "65536")
             ),
         },
     }
