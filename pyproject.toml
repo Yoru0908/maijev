@@ -7,6 +7,7 @@ dependencies = [
     "loguru>=0.7.3",
     "pydantic>=2.12.5",
     "python-dotenv>=1.0.0",
+    "yt-dlp>=2026.8.19",
 ]
 
 [dependency-groups]

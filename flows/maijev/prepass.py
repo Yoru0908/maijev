@@ -90,16 +90,20 @@ def run_prepass(
     items: list[ContextItem],
     results: list[dict[str, Any]] | None,
     lines: list[MergedLine],
+    *,
+    extra_anchors: list[dict[str, Any]] | None = None,
     cache_dir: Path | None = None,
 ) -> str:
     """Run the shared text-only pre-pass; return glossary text.
 
     Called once per run when ``--ocr-json`` or ``--prepass`` is given.
     ``results=None`` means JEV never ran and ``items`` are raw OCR text.
-    The cache key covers both inputs (anchors + subtitle lines) plus system
+    ``extra_anchors`` are pre-classified anchors (e.g. cast names from the
+    video source metadata) injected verbatim, bypassing JEV filtering.
+    The cache key covers all inputs (anchors + subtitle lines) plus system
     prompt and model, so any change invalidates the cache automatically.
     """
-    anchors = build_anchors(items, results)
+    anchors = build_anchors(items, results) + list(extra_anchors or [])
     system = _load_system()
     model = os.environ.get("PREPASS_MODEL") or os.environ.get(
         "TRANSLATE_MODEL", DEFAULT_MODEL
