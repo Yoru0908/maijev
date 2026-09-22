@@ -31,7 +31,7 @@ from typing import Any
 
 from loguru import logger
 
-from .llm import generate_json
+from .llm import generate_json, resolve_model
 
 # Atoms per LLM call, plus trailing context shown but not decided.
 # 1000 atoms ≈ 30min of audio — one call per half hour, two calls for 1h.
@@ -229,7 +229,7 @@ def _format_atom(i: int, a: dict) -> str:
 
 
 def _llm_merge_batch(
-    atoms: list[dict], start_idx: int, end_idx: int
+    atoms: list[dict], start_idx: int, end_idx: int, model: str
 ) -> list[list[int]]:
     """Ask the LLM for safe merge groups within one batch."""
     lines = []
@@ -244,7 +244,7 @@ def _llm_merge_batch(
     result = generate_json(
         prompt,
         system=_load_system(),
-        model=os.environ.get("SEGMENT_MODEL", "gemini-2.5-pro"),
+        model=model,
     )
     raw_groups = result.get("groups", []) if isinstance(result, dict) else []
 
@@ -284,6 +284,7 @@ def _merge_one(
     # shift indices, so an index-keyed cache would silently misapply.
     # The system prompt and model are part of the key so prompt/model
     # changes invalidate old batches automatically.
+    model = resolve_model("SEGMENT_MODEL")
     key_input = "\n".join(
         _format_atom(i, atoms[i]) for i in range(start, end)
     )
@@ -291,7 +292,7 @@ def _merge_one(
         (
             key_input
             + "\n<system>\n" + _load_system()
-            + "\n<model>\n" + os.environ.get("SEGMENT_MODEL", "gemini-2.5-pro")
+            + "\n<model>\n" + model
         ).encode()
     ).hexdigest()[:16]
     cache_file = cache_dir / f"batch_{key}.json" if cache_dir else None
@@ -301,7 +302,7 @@ def _merge_one(
     batch_groups = None
     for attempt in (1, 2):
         try:
-            batch_groups = _llm_merge_batch(atoms, start, end)
+            batch_groups = _llm_merge_batch(atoms, start, end, model)
             break
         except Exception as e:
             logger.warning(

@@ -19,11 +19,10 @@ from typing import Any
 from loguru import logger
 
 from .jev import ContextItem, select_anchors
-from .llm import generate_json
+from .llm import generate_json, resolve_model
 from .segment_llm import MergedLine
 
 PROMPT_PATH = Path(__file__).parent / "prepass_prompt.md"
-DEFAULT_MODEL = "gemini-2.5-pro"
 
 
 def _load_system() -> str:
@@ -105,9 +104,7 @@ def run_prepass(
     """
     anchors = build_anchors(items, results) + list(extra_anchors or [])
     system = _load_system()
-    model = os.environ.get("PREPASS_MODEL") or os.environ.get(
-        "TRANSLATE_MODEL", DEFAULT_MODEL
-    )
+    model = os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL")
     body = (
         "【画面文字】\n"
         + json.dumps(anchors, ensure_ascii=False, indent=1)

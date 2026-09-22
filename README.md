@@ -83,12 +83,20 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `GEMINI_API_KEY` | Google AI Studio |
 | `OPENROUTER_API_KEY` | 没有 Gemini key 时的 LLM fallback；同时用于 ASR |
 | `GEMINI_AGENT_PLATFORM_BASE_URL` | 可选的 Vertex publisher endpoint |
-| `GEMINI_MODEL` | 全局 Gemini 模型默认值 |
+| `GEMINI_MODEL` | 全局 Gemini 模型默认值（同 `--model`，默认 `gemini-2.5-pro`） |
 | `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
+| `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
+| `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
-| `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
+
+模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。当前默认
+`gemini-2.5-pro`——**该型号 2026 年 10 月下架**，届时默认会切到
+`gemini-3.8-flash`（GA，同价 $0.75/$3.75 per 1M，端点与请求格式不变，
+仅 thinking 参数从 `thinkingBudget` 换成 `thinkingLevel`）。现在就可以
+用 `--model gemini-3.8-flash` 或 `GEMINI_MODEL` 提前切换；想更高质量可用
+`gemini-3.1-pro-preview`。
 
 Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选其一：
 
@@ -308,7 +316,8 @@ uv run python -m flows.maijev.pipeline \
 
 ## 费用估算
 
-一次 26.5 分钟综艺视频的实测数据（`gemini-2.5-pro`，完整链路含 pre-pass）：
+一次 26.5 分钟综艺视频的实测数据（`gemini-2.5-pro` 实测，完整链路含
+pre-pass；换 `gemini-3.8-flash` 价格接近）：
 
 | 阶段 | 用时 | 费用 |
 |---|---:|---:|
