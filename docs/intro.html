@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>maijev — 日语音视频 → 中文字幕流水线</title>
+<style>
+  :root {
+    --bg: #070b16;
+    --fg: #e8ecf4;
+    --dim: #8b93a7;
+    --cyan: #4dd8ff;
+    --pink: #ff6ad5;
+    --card: rgba(13, 20, 38, 0.72);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "SF Pro", "PingFang SC", "Hiragino Sans GB",
+      "Microsoft YaHei", sans-serif;
+    overflow-x: hidden;
+  }
+  #bg3d {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+  .vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(7,11,22,.75) 100%);
+  }
+  main { position: relative; z-index: 2; }
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12vh 8vw;
+  }
+  .hero h1 {
+    font-size: clamp(64px, 12vw, 160px);
+    font-weight: 800;
+    letter-spacing: .02em;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 80px rgba(77, 216, 255, .25);
+  }
+  .hero .sub {
+    margin-top: 24px;
+    font-size: clamp(20px, 3vw, 34px);
+    color: var(--dim);
+    letter-spacing: .12em;
+  }
+  .hero .repo {
+    margin-top: 48px;
+    font-size: 16px;
+    color: var(--cyan);
+    font-family: ui-monospace, monospace;
+    opacity: .9;
+  }
+  .scroll-hint {
+    position: absolute;
+    bottom: 5vh;
+    color: var(--dim);
+    font-size: 14px;
+    letter-spacing: .3em;
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(10px); opacity: .4; } }
+
+  h2 {
+    font-size: clamp(30px, 4.5vw, 52px);
+    font-weight: 700;
+    margin-bottom: 6vh;
+    align-self: flex-start;
+  }
+  h2 .accent { color: var(--cyan); }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    width: 100%;
+    max-width: 1200px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid rgba(120, 150, 255, .12);
+    border-radius: 16px;
+    padding: 26px 24px;
+    backdrop-filter: blur(10px);
+    transition: border-color .4s, transform .4s;
+  }
+  .card.lit { border-color: rgba(77, 216, 255, .55); transform: translateY(-4px); }
+  .card .step {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--pink);
+    letter-spacing: .2em;
+    margin-bottom: 10px;
+  }
+  .card h3 { font-size: 20px; margin-bottom: 10px; }
+  .card p { font-size: 15px; line-height: 1.75; color: var(--dim); }
+
+  .tiers { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 980px; }
+  .tier {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    background: var(--card);
+    border: 1px solid rgba(120,150,255,.12);
+    border-radius: 12px;
+    padding: 18px 24px;
+    backdrop-filter: blur(10px);
+  }
+  .tier .tag {
+    flex: none;
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    border: 1px solid rgba(77,216,255,.4);
+    border-radius: 999px;
+    padding: 3px 12px;
+    white-space: nowrap;
+  }
+  .tier code { color: var(--pink); font-size: 14px; }
+  .tier span { color: var(--dim); font-size: 15px; line-height: 1.6; }
+
+  .stats {
+    display: flex;
+    gap: 48px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .stat { text-align: center; }
+  .stat .num {
+    font-size: clamp(44px, 7vw, 84px);
+    font-weight: 800;
+    background: linear-gradient(180deg, var(--fg), var(--cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .stat .lbl { color: var(--dim); font-size: 15px; margin-top: 8px; }
+
+  .final h2 { align-self: center; text-align: center; }
+  .final .repo-big {
+    font-family: ui-monospace, monospace;
+    font-size: clamp(18px, 3vw, 30px);
+    color: var(--cyan);
+    border: 1px solid rgba(77,216,255,.35);
+    border-radius: 999px;
+    padding: 14px 36px;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+<canvas id="bg3d"></canvas>
+<div class="vignette"></div>
+<main>
+  <section class="hero">
+    <h1>maijev</h1>
+    <div class="sub">日语音视频 → 中文字幕 · 流水线</div>
+    <div class="repo">github.com/Yoru0908/maijev</div>
+    <div class="scroll-hint">SCROLL ▾</div>
+  </section>
+
+  <section>
+    <h2><span class="accent">主干</span> — 五步走，时间轴归程序</h2>
+    <div class="cards" id="mainline">
+      <div class="card"><div class="step">01 / ASR</div><h3>MAI-Transcribe-2</h3><p>词级时间戳 + speaker 分离，长音频自动切片、逐块缓存重试。</p></div>
+      <div class="card"><div class="step">02 / ATOMS</div><h3>确定性拆分</h3><p>按静音、标点、speaker 边界切原子——LLM 不参与，时间戳永远精确。</p></div>
+      <div class="card"><div class="step">03 / MERGE</div><h3>Gemini 断句</h3><p>只合并 atom，不生成时间轴；结果按内容哈希缓存，断点续跑。</p></div>
+      <div class="card"><div class="step">04 / TRANSLATE</div><h3>Gemini 翻译</h3><p>JSON 契约输出、按 id 对齐，缺行自动二分重试。</p></div>
+      <div class="card"><div class="step">05 / SRT</div><h3>程序渲染</h3><p>译文映射回原始时间轴输出 SRT——LLM 从头到尾碰不到时间戳。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="accent">可选支线</span> — 没有词库，也能全片译名一致</h2>
+    <div class="tiers">
+      <div class="tier"><span class="tag">完整链路</span><span><code>--extract-frames</code> → 代表帧 → 外部 OCR → Jev 筛掉效果字/对白 → 纯文本 pre-pass</span></div>
+      <div class="tier"><span class="tag">无 JEV</span><span><code>--ocr-json</code> 直进 pre-pass——没有 Cloudflare / TypeSafe 凭据也能跑</span></div>
+      <div class="tier"><span class="tag">无 OCR</span><span><code>--prepass</code> 只用字幕全文生成词库</span></div>
+      <div class="tier"><span class="tag">远程来源</span><span>BV / ep / Abema / YouTube ID 或 URL → yt-dlp 下载；TVer/Abema cast 名单作为权威人名锚点直进 pre-pass</span></div>
+      <div class="tier"><span class="tag">产物</span><span><code>glossary.md</code> 自动词库（原文 → 写法），注入每一个翻译批次</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="accent">实测</span> — 26.5 分钟综艺</h2>
+    <div class="stats">
+      <div class="stat"><div class="num">$0.25</div><div class="lbl">总成本（ASR $0.044 + LLM ~$0.2）</div></div>
+      <div class="stat"><div class="num">12min</div><div class="lbl">端到端用时</div></div>
+      <div class="stat"><div class="num">37</div><div class="lbl">pre-pass 产出的词库条目</div></div>
+      <div class="stat"><div class="num">0</div><div class="lbl">需要的静态词库</div></div>
+    </div>
+  </section>
+
+  <section class="final">
+    <h2>开源 · <span class="accent">MIT</span></h2>
+    <div class="repo-big">github.com/Yoru0908/maijev</div>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="intro.js"></script>
+</body>
+</html>
