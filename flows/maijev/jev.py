@@ -1,8 +1,14 @@
-"""Cloudflare Workers AI Jev context classification.
+"""Jev context classification (TypeSafe API or Cloudflare Workers AI).
 
 This module only accepts OCR observations at the Jev boundary. It does not
 classify ASR lines or images; the pipeline passes only selected OCR text onward.
-The client is provider-specific, while the pipeline consumes generic context.
+Two backends are supported and interchangeable:
+
+- ``TypeSafeJevClient`` — official ``api.typesafe.ai/v1/systemone`` endpoint
+  (``TYPESAFE_API_KEY``), flat ``state``/``questions`` request body.
+- ``CloudflareJevClient`` — Cloudflare Workers AI ``typesafe/jev`` model
+  (``CLOUDFLARE_ACCOUNT_ID`` + ``CLOUDFLARE_API_TOKEN``), which wraps the same
+  payload in an ``input`` object and the response in a ``result`` object.
 """
 
 from __future__ import annotations
@@ -17,7 +23,9 @@ from pathlib import Path
 from typing import Any
 
 
-JEV_MODEL = "typesafe/jev"
+JEV_MODEL = "typesafe/jev"  # Cloudflare Workers AI model id
+TYPESAFE_MODEL = "jev-latest"  # official TypeSafe API model id
+TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_BATCH_SIZE = 25
 CONTEXT_KINDS = {
     "person_name": "A person's name, performer name, or visible nameplate",
@@ -115,64 +123,81 @@ def load_ocr_items(path: Path) -> list[ContextItem]:
 
 
 
-class JevClient:
-    """Small stdlib-only client for the Cloudflare Jev endpoint."""
+def _post_json(
+    url: str,
+    token: str,
+    body: dict[str, Any],
+    timeout: int,
+    provider: str,
+) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(
+            f"{provider} HTTP {exc.code}: {detail}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"{provider} connection failed: {exc}") from exc
 
-    def __init__(
-        self,
-        account_id: str,
-        api_token: str,
-        *,
-        model: str = JEV_MODEL,
-        timeout: int = 120,
-    ) -> None:
-        self.account_id = account_id
-        self.api_token = api_token
-        self.model = model
-        self.timeout = timeout
+
+class JevClient:
+    """Shared batching/caching/parsing; subclasses supply the wire format."""
+
+    model: str
+    timeout: int
+    provider: str
 
     @classmethod
     def from_env(cls) -> "JevClient":
-        account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
-        api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
-        missing = []
-        if not account_id:
-            missing.append("CLOUDFLARE_ACCOUNT_ID")
-        if not api_token:
-            missing.append("CLOUDFLARE_API_TOKEN")
-        if missing:
-            raise RuntimeError(
-                "Jev context requires " + ", ".join(missing)
-            )
-        return cls(account_id, api_token)
+        """Pick a backend from the environment.
 
-    @property
-    def url(self) -> str:
-        return (
-            "https://api.cloudflare.com/client/v4/accounts/"
-            f"{self.account_id}/ai/run"
-        )
+        ``JEV_BACKEND`` forces ``typesafe`` or ``cloudflare``. Otherwise the
+        official TypeSafe API is preferred when ``TYPESAFE_API_KEY`` is set,
+        falling back to the Cloudflare Workers AI credential pair.
+        """
+        backend = os.environ.get("JEV_BACKEND", "").strip().lower()
+        if backend in ("typesafe", "official"):
+            return TypeSafeJevClient.from_env()
+        if backend == "cloudflare":
+            return CloudflareJevClient.from_env()
+        if backend:
+            raise RuntimeError(
+                f"unknown JEV_BACKEND {backend!r} (typesafe|cloudflare)"
+            )
+        api_key = os.environ.get("TYPESAFE_API_KEY", "").strip()
+        if api_key:
+            return TypeSafeJevClient(api_key)
+        try:
+            return CloudflareJevClient.from_env()
+        except RuntimeError:
+            raise RuntimeError(
+                "Jev classification requires TYPESAFE_API_KEY or "
+                "CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN"
+            ) from None
+
+    def _request_body(
+        self,
+        state: dict[str, Any],
+        questions: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
 
     def _post(self, body: dict[str, Any]) -> dict[str, Any]:
-        request = urllib.request.Request(
-            self.url,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_token}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(
-                f"Cloudflare Jev HTTP {exc.code}: {detail}"
-            ) from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"Cloudflare Jev connection failed: {exc}") from exc
+        raise NotImplementedError
+
+    def _answers(self, response: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
 
     def classify(
         self,
@@ -214,10 +239,7 @@ class JevClient:
                     ),
                     "criteria": CONTEXT_KINDS,
                 }
-            body = {
-                "model": self.model,
-                "input": {"state": state, "questions": questions},
-            }
+            body = self._request_body(state, questions)
             key = hashlib.sha1(
                 json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")
             ).hexdigest()[:16]
@@ -235,20 +257,16 @@ class JevClient:
                         json.dumps(response, ensure_ascii=False, indent=2),
                         encoding="utf-8",
                     )
-            result = response.get("result", response)
-            if (
-                isinstance(result, dict)
-                and isinstance(result.get("result"), dict)
-            ):
-                result = result["result"]
-            answers = result.get("answers") if isinstance(result, dict) else None
+            answers = self._answers(response)
             if not isinstance(answers, dict):
-                raise RuntimeError("Cloudflare Jev response has no answers")
+                raise RuntimeError(
+                    f"{self.provider} response has no answers"
+                )
             for question_id, item in question_map.items():
                 answer = answers.get(question_id)
                 if not isinstance(answer, dict) or answer.get("type") != "choice":
                     raise RuntimeError(
-                        f"Cloudflare Jev response missing {question_id}"
+                        f"{self.provider} response missing {question_id}"
                     )
                 choice = str(answer.get("choice", "unknown"))
                 if choice not in CONTEXT_KINDS:
@@ -264,6 +282,109 @@ class JevClient:
                     }
                 )
         return results
+
+
+class TypeSafeJevClient(JevClient):
+    """Official TypeSafe API: flat ``state``/``questions``, top-level answers."""
+
+    provider = "TypeSafe Jev"
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        model: str = TYPESAFE_MODEL,
+        url: str = TYPESAFE_URL,
+        timeout: int = 120,
+    ) -> None:
+        self.api_key = api_key
+        self.model = model
+        self.url = url
+        self.timeout = timeout
+
+    @classmethod
+    def from_env(cls) -> "TypeSafeJevClient":
+        api_key = os.environ.get("TYPESAFE_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("Jev context requires TYPESAFE_API_KEY")
+        return cls(api_key)
+
+    def _request_body(
+        self,
+        state: dict[str, Any],
+        questions: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {"state": state, "model": self.model, "questions": questions}
+
+    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+        return _post_json(
+            self.url, self.api_key, body, self.timeout, self.provider
+        )
+
+    def _answers(self, response: dict[str, Any]) -> dict[str, Any]:
+        return response.get("answers")
+
+
+class CloudflareJevClient(JevClient):
+    """Cloudflare Workers AI: wraps state/questions in ``input``."""
+
+    provider = "Cloudflare Jev"
+
+    def __init__(
+        self,
+        account_id: str,
+        api_token: str,
+        *,
+        model: str = JEV_MODEL,
+        timeout: int = 120,
+    ) -> None:
+        self.account_id = account_id
+        self.api_token = api_token
+        self.model = model
+        self.timeout = timeout
+
+    @classmethod
+    def from_env(cls) -> "CloudflareJevClient":
+        account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+        api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+        missing = []
+        if not account_id:
+            missing.append("CLOUDFLARE_ACCOUNT_ID")
+        if not api_token:
+            missing.append("CLOUDFLARE_API_TOKEN")
+        if missing:
+            raise RuntimeError(
+                "Jev context requires " + ", ".join(missing)
+            )
+        return cls(account_id, api_token)
+
+    @property
+    def url(self) -> str:
+        return (
+            "https://api.cloudflare.com/client/v4/accounts/"
+            f"{self.account_id}/ai/run"
+        )
+
+    def _request_body(
+        self,
+        state: dict[str, Any],
+        questions: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "input": {"state": state, "questions": questions},
+        }
+
+    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+        return _post_json(
+            self.url, self.api_token, body, self.timeout, self.provider
+        )
+
+    def _answers(self, response: dict[str, Any]) -> dict[str, Any]:
+        result = response.get("result", response)
+        if isinstance(result, dict) and isinstance(result.get("result"), dict):
+            result = result["result"]
+        return result.get("answers") if isinstance(result, dict) else None
 
 
 ENTITY_KINDS = {"person_name", "program_title", "place_or_brand"}

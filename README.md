@@ -89,15 +89,17 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
 
-Jev OCR 上下文（可选；仅 `--ocr-json` 时用到）：
+Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选其一：
 
 | 环境变量 | 用途 |
 |---|---|
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
-| `CLOUDFLARE_API_TOKEN` | 调用 Workers AI Jev 的 API token |
+| `TYPESAFE_API_KEY` | 官方 TypeSafe API（`api.typesafe.ai`，推荐） |
+| `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | Cloudflare Workers AI 上的 Jev |
+| `JEV_BACKEND` | 两套凭据都在时强制选择：`typesafe` 或 `cloudflare` |
 
-没有 Cloudflare 凭据时 `--ocr-json` 仍可用：跳过 JEV 分类，OCR 原始文字
-直接进 pre-pass。同理 `--prepass` 可在没有任何 OCR 时单独运行。
+不设 `JEV_BACKEND` 时优先官方 API，缺省回落 Cloudflare。两组凭据都没有时
+`--ocr-json` 仍可用：跳过 JEV 分类，OCR 原始文字直接进 pre-pass。同理
+`--prepass` 可在没有任何 OCR 时单独运行。
 
 LLM 后端选择顺序：
 

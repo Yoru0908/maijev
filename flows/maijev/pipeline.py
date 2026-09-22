@@ -120,8 +120,8 @@ def run(
             jev = JevClient.from_env()
         except RuntimeError:
             logger.info(
-                "No Cloudflare credentials — OCR items go to the pre-pass "
-                "unfiltered (JEV classification skipped)"
+                "No Jev credentials (TYPESAFE_API_KEY or Cloudflare) — "
+                "OCR items go to the pre-pass unfiltered"
             )
         else:
             jev_results = jev.classify(
