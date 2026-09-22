@@ -3,18 +3,24 @@
 `maijev` 是一条面向长视频的日语字幕流水线：
 
 ```text
-视频/音频
-  → ffmpeg 抽取音频
-  → MAI-Transcribe-2 词级 ASR
-  → 静音、标点、speaker 边界拆 atom
-  → Gemini 合并字幕行
-  → Gemini 翻译中文
-  → 程序恢复时间轴并输出 SRT
+主干（每次运行都执行）：
 
-并行支线（可选）：
-  视频 --extract-frames → 稀疏代表帧 → [外部 OCR] → --ocr-json
-  → Jev 分类筛选 → 纯文本 pre-pass（一次，读 OCR anchor + 全日文行）
-  → glossary.md 自动词库 → 注入翻译 system prompt
+  视频/音频
+    → ffmpeg 抽取音频
+    → MAI-Transcribe-2 词级 ASR
+    → 静音、标点、speaker 边界拆 atom
+    → Gemini 合并字幕行
+    → Gemini 翻译中文 ──→ 程序恢复时间轴，输出 SRT
+                          ▲
+                          │ 注入 glossary.md 自动词库（有支线时）
+                          │
+可选支线（译名一致性，逐层降级，缺哪层降哪层）：
+
+  完整链路      --extract-frames → 代表帧 → 外部 OCR → ocr.json
+                → Jev 分类筛选 ──────────┐
+  有 OCR 无 JEV  ocr.json 原文直进 ──────┤→ 纯文本 pre-pass（一次调用：
+  无 OCR         --prepass ──────────────┘   OCR 文字 + 全日文行）
+                                             → glossary.md → 翻译批次共享
 ```
 
 项目仓库：
@@ -158,19 +164,35 @@ runs/example/out_llm_ja.srt
 runs/example/out_zh.srt
 ```
 
-### 可选：Jev OCR 分类 + 纯文本 pre-pass
+### 可选：视觉上下文支线（OCR → pre-pass → 自动词库）
 
-如果已有独立 OCR 工具输出的画面文字，可以通过 `--ocr-json` 让 Jev 只对这些
-OCR observation 做语义分类。ASR 字幕行和图片本身不会传给 Jev。
+整条支线是可选的，而且**逐层降级**——有什么凭据就走哪一层：
 
-Jev 筛出的实体（人名、节目名、地点/品牌，以及低置信度待复核项）随后与 merge
-产出的全部日文行一起，进入一次**纯文本 pre-pass**：Gemini 把 OCR 变体归并为
-规范实体并给出写法，产出 `glossary.md` 自动词库。这一步代替了逐批的内部预
-分析——每个翻译批次注入的是同一份词库，而不是各自从原始 OCR 文字猜测写法。
+```text
+有 OCR 工具 + Cloudflare/JEV 凭据（完整链路）：
+  ocr.json → Jev 分类筛选（丢弃效果字/对白/噪声）
+           → 筛出的实体进 pre-pass
 
-字幕合并（merge）阶段不接收任何 OCR 内容，与 mai-flow 主干完全一致。
+有 OCR、无 Cloudflare 凭据：
+  ocr.json → OCR 原文不筛选，直进 pre-pass
 
-### 可选：稀疏代表帧抽取
+无 OCR，仅加 --prepass：
+  字幕全文单独进 pre-pass
+
+什么都不加：
+  不初始化 Jev、不跑 pre-pass、不要求任何额外凭据
+```
+
+无论走哪层，终点都是同一次**纯文本 pre-pass**：Gemini 收到 OCR 文字（筛过
+或原文）+ merge 产出的全部日文行，把实体变体归并成 `glossary.md` 自动词库。
+它代替了逐批的内部预分析——每个翻译批次注入的是同一份词库，而不是各自从
+原始 OCR 文字猜测写法。字幕合并（merge）阶段不接收任何 OCR 内容，与 mai-flow
+主干完全一致。
+
+OCR 本身不在本仓库实现：`--extract-frames` 只负责抽帧，OCR 由你自己的工具
+完成，结果经 `--ocr-json` 传回。
+
+#### 稀疏代表帧抽取
 
 使用 `--extract-frames` 按 grillmaster 验证过的策略抽取少量代表帧：
 
@@ -196,7 +218,8 @@ runs/example/reference_frames/
 └── frames_manifest.json       # 帧时间戳和路径清单
 ```
 
-这些代表帧可以送给外部 OCR 工具，再把 OCR 结果通过 `--ocr-json` 传回给 Jev 分类。
+这些代表帧可以送给外部 OCR 工具，再把 OCR 结果通过 `--ocr-json` 传回——有
+Cloudflare 凭据会先经 Jev 分类筛选，没有则原文直进 pre-pass。
 
 输入支持以下三种 JSON 形状：
 
@@ -217,6 +240,7 @@ runs/example/reference_frames/
 为可选字段。
 
 ```bash
+# 可选：有 Cloudflare 凭据才导出；没有也能跑，OCR 原文直进 pre-pass
 export CLOUDFLARE_ACCOUNT_ID=...
 export CLOUDFLARE_API_TOKEN=...
 
@@ -237,9 +261,8 @@ runs/example/prepass_cache/           # pre-pass 响应缓存
 runs/example/glossary.md              # pre-pass 产出的自动词库
 ```
 
-没有 `--ocr-json` 时，流水线不初始化 Jev、不运行 pre-pass，也不会要求
-Cloudflare 凭据。如需在没有 OCR 的情况下单独跑纯文本 pre-pass（只用字幕
-全文生成词库），可加 `--prepass` 开关。
+没有 `--ocr-json` 也没有 `--prepass` 时，整条支线不运行，也不需要任何额外
+凭据。
 
 
 ### 指定基线 SRT 路径
