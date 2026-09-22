@@ -1,0 +1,15 @@
+[project]
+name = "maijev"
+version = "0.1.0"
+description = "MAI-Transcribe-2 ASR pipeline: transcribe → atomize → LLM merge → translate"
+requires-python = ">=3.13"
+dependencies = [
+    "loguru>=0.7.3",
+    "pydantic>=2.12.5",
+    "python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
