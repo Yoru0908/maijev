@@ -39,6 +39,7 @@ https://github.com/Yoru0908/maijev
 - LLM 输出使用 JSON，程序负责校验、按 id 对齐和生成 SRT。
 - 普通短促相槌在进入 merge LLM 前由程序处理，避免翻译阶段产生空字幕行。
 - 不内置任何特定节目、成员或项目词库；需要术语一致性时，可以通过外部文件注入。
+- 可选 Web GUI：浏览器里跑任务、看进度、改词库重翻（`uv sync --extra gui`）。
 
 ## 安装
 
@@ -89,6 +90,8 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
 | `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
+| `SEGMENT_BATCH_SIZE` | merge 每次调用的 atom 数，默认 `1000` |
+| `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
 模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。当前默认
@@ -97,6 +100,27 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 仅 thinking 参数从 `thinkingBudget` 换成 `thinkingLevel`）。现在就可以
 用 `--model gemini-3.8-flash` 或 `GEMINI_MODEL` 提前切换；想更高质量可用
 `gemini-3.1-pro-preview`。
+
+### 模型选择建议
+
+merge 和 translate **推荐 pro 级模型**。原因不是"上下文更大"——1000 行
+一批只有 30–40k token 输入，pro 和 flash 的上下文都远远够用；真正的差异
+在两处：
+
+- **契约遵循度。** merge 要求 groups 连续不重叠，translate 要求每个 id 恰好
+  出现一次。flash 漏一个 id 就触发整批二分重试，多出的调用往往把单价差
+  吃回去。
+- **译文质量。** 人名汉字保留、敬称处理、语气词省略这些细则，pro 更稳。
+
+batch 大小（`SEGMENT_BATCH_SIZE` / `TRANSLATE_BATCH_SIZE`）受**输出**上限
+约束：1000 行中文 JSON 约 25–35k 输出 token，默认 65536 上限下再翻倍就会
+撞顶。换模型时先看它的最大输出，再调这两个值。跨 batch 的译名一致性由
+`glossary.md` 保证，不依赖把所有行塞进同一批。
+
+非 Gemini 模型（OpenAI / Claude 等）不单独接端点：只配 `OPENROUTER_API_KEY`
+时 LLM 走 OpenRouter chat/completions，`GEMINI_MODEL=anthropic/claude-…`
+这类 OpenRouter 模型名即可切换。prompt 与 JSON 契约按 Gemini 调过，换家
+需自行验证遵循度。
 
 Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选其一：
 
@@ -460,7 +484,7 @@ Gemini 做**一次共享的纯文本调用**，产出 `glossary.md` 自动词库
 `segment_llm.merge_utterances()` 按 batch 发送 atom。当前配置：
 
 ```text
-BATCH_SIZE = 1000 atoms
+BATCH_SIZE = 1000 atoms   （SEGMENT_BATCH_SIZE 可调）
 MAX_WORKERS = 2
 CONTEXT_TAIL = 20 atoms
 ```
@@ -519,7 +543,7 @@ MergedLine.start + MergedLine.end + translated zh
 翻译配置：
 
 ```text
-BATCH_SIZE = 1000 lines
+BATCH_SIZE = 1000 lines   （TRANSLATE_BATCH_SIZE 可调）
 MAX_WORKERS = 2
 maxOutputTokens = 65536
 ```
@@ -549,6 +573,31 @@ export TRANSLATE_GLOSSARY_PATH=/path/to/private-glossary.md
 
 程序会把该文件追加到 translation system prompt，且不会把它复制到仓库、缓存或
 Git 历史。不开启该变量时，翻译完全使用通用 prompt 和当前批次上下文。
+
+## Web GUI（可选）
+
+不想敲命令行、或者视频放在另一台机器上，可以起一个本地 Web 界面：
+
+```bash
+uv sync --extra gui
+uv run python -m flows.maijev.gui            # http://127.0.0.1:8792
+uv run python -m flows.maijev.gui --host 0.0.0.0 --runs /vol1/maijev_runs   # 放服务器上
+```
+
+GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipeline` 子进程
+加一个 work_dir，进度、结果、词库全部从 work_dir 里已有的文件推导，pipeline
+本身零改动。功能：
+
+- 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
+- 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
+- 下载 `out_zh.srt` / `out_llm_ja.srt` / `out.srt`，页内预览。
+- **人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
+  会以 `TRANSLATE_GLOSSARY_PATH` 重跑——ASR / 合并 / pre-pass 全部命中缓存，
+  只有翻译重新调用。没有 OCR、没有 Jev 的用户就靠这一步修正译名：先开
+  pre-pass 拿一版自动词库，改掉不满意的条目，重翻即可。
+
+凭据状态在顶栏显示（只显示有无，不显示值）。绑定 `127.0.0.1` 时无鉴权；
+要对外暴露请自己套一层反向代理或 SSH 隧道，服务本身没有账号体系。
 
 ## Prompt 实验台
 
@@ -670,10 +719,15 @@ maijev/
 │   ├── prepass.py              # 纯文本 pre-pass → glossary.md
 │   ├── prepass_prompt.md       # pre-pass 词库生成 prompt
 │   ├── frames.py               # 稀疏代表帧抽取（OCR/JEV 用）
-│   ├── jev.py                  # Cloudflare Jev OCR 分类
+│   ├── jev.py                  # TypeSafe / Cloudflare Jev OCR 分类
 │   ├── llm.py                  # Vertex / AI Studio / OpenRouter client
+│   ├── source.py               # yt-dlp 远程来源 + TVer/Abema cast
 │   ├── pipeline.py             # CLI 编排入口
-│   └── seg_lab.py              # 断句实验台
+│   ├── seg_lab.py              # 断句实验台
+│   └── gui/                    # 可选 Web GUI（FastAPI + 单页）
+│       ├── server.py           #   子进程 + SSE + work_dir 文件暴露
+│       └── static/             #   index.html / app.js
+├── docs/                       # 介绍页 intro.html / tech.html
 ├── services/
 ├── tests/                      # 纯函数测试（不调 LLM/ffmpeg）
 ├── pyproject.toml
