@@ -729,7 +729,7 @@ maijev/
 │   └── gui/                    # 可选 Web GUI（FastAPI + 单页）
 │       ├── server.py           #   子进程 + SSE + work_dir 文件暴露
 │       └── static/             #   index.html / app.js
-├── docs/                       # 介绍首页 index.html / 原介绍 intro.html / 技术说明 tech.html
+├── docs/                       # 介绍首页 index.html / 旧入口 intro.html 自动跳转 / 技术说明 tech.html
 ├── services/
 ├── tests/                      # 纯函数测试（不调 LLM/ffmpeg）
 ├── pyproject.toml
