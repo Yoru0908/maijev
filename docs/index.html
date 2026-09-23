@@ -7,7 +7,7 @@
 <title>maijev — 项目介绍演示</title>
 <style>
 :root{--ink:#202923;--muted:#69736c;--line:#dfe5df;--green:#326744;--wash:#f4f7f2;--type-title:64px;--type-hero:100px;--type-subtitle:42px;--type-body:34px;--type-small:28px;--type-code:28px;--pad-top:60px;--pad-bottom:45px;--pad-x:100px;--pad-panel:28px;--gap-title:32px;--gap-item:20px;--gap-wide:64px;--mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
-*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f3f5f2;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}deck-stage:not(:defined){visibility:hidden}deck-stage{bottom:66px}section{display:flex;flex-direction:column;background:white;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);font-size:var(--type-body);line-height:1.6}h1,h2,h3,p,pre{margin:0}h1{font-size:var(--type-hero);line-height:1.25;letter-spacing:-4px;font-weight:650}h2{font-size:var(--type-title);line-height:1.3;letter-spacing:-2px;font-weight:600}h3{font-size:var(--type-subtitle);line-height:1.4;font-weight:550}p{color:var(--muted)}a{color:var(--green);text-underline-offset:6px}a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--green);outline-offset:4px}.topline{display:flex;justify-content:space-between;align-items:center;padding-bottom:var(--gap-item);margin-bottom:var(--gap-title);border-bottom:1px solid var(--line);font:var(--type-small)/1.5 var(--mono);color:var(--muted)}.brand{color:var(--green);font-weight:700}.eyebrow{font:var(--type-small)/1.6 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.green{color:var(--green)}.lead{margin-top:var(--gap-item);max-width:1500px}.body{margin-top:var(--gap-title)}.two{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-wide)}.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap-title)}.two>*,.three>*{min-width:0}.foot{margin-top:auto;padding-top:var(--gap-item);display:flex;justify-content:space-between;gap:var(--gap-item);border-top:1px solid var(--line);font-size:var(--type-small);color:var(--muted)}.small{font-size:var(--type-small)}.mono{font-family:var(--mono)}.panel{padding:var(--pad-panel);background:var(--wash);border:1px solid var(--line);border-radius:6px}.panel h3{margin-bottom:var(--gap-item)}.panel p+p{margin-top:var(--gap-item)}.plain{padding-top:var(--gap-item);border-top:2px solid var(--ink)}.plain h3{margin-bottom:var(--gap-item)}.tag{font:var(--type-small)/1.5 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.ascii{font:var(--type-code)/1.6 var(--mono);white-space:pre;color:#354d3c}.code{font:var(--type-code)/1.6 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}.note{font-size:var(--type-small);margin-top:var(--gap-item)}.cover-main{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--gap-wide);align-items:center;flex:1;padding-bottom:var(--gap-title)}.cover-name{font:var(--type-subtitle)/1.5 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.cover-main p{margin-top:var(--gap-item)}.cover-flow{border-left:1px solid var(--line);padding-left:var(--gap-wide)}.flow-step{display:flex;align-items:baseline;gap:var(--gap-item);padding:var(--gap-item) 0;border-bottom:1px solid var(--line)}.flow-step span{font:var(--type-small)/1.4 var(--mono);color:var(--green)}.flow-step b{font-size:var(--type-body);font-weight:500}.big-number{font:var(--type-hero)/1.25 var(--mono);color:var(--green)}.metric-label{font-size:var(--type-small);margin-top:var(--gap-item)}.compare{width:100%;border-collapse:collapse;font-size:var(--type-small)}.compare th,.compare td{text-align:left;padding:var(--gap-item);border-bottom:1px solid var(--line);vertical-align:top}.compare th{font-size:var(--type-body);font-weight:550}.compare td{color:var(--muted)}.compare td:last-child,.compare th:last-child{background:var(--wash)}.compare td:first-child{color:var(--ink);width:19%}.compare th:nth-child(2){width:40%}.row{display:grid;grid-template-columns:300px 1fr;gap:var(--gap-title);padding:var(--gap-item) 0;border-top:1px solid var(--line)}.row strong{font-weight:550}.list{margin:0;padding-left:var(--pad-panel);color:var(--muted)}.list li+li{margin-top:var(--gap-item)}.citation{display:flex;flex-direction:column;gap:var(--gap-item)}.citation a{font-size:var(--type-body)}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f3f5f2;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}deck-stage:not(:defined){visibility:hidden}deck-stage{bottom:66px}section{display:flex;flex-direction:column;background:white;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);font-size:var(--type-body);line-height:1.6}h1,h2,h3,p,pre{margin:0}h1{font-size:var(--type-hero);line-height:1.25;letter-spacing:-4px;font-weight:650}h2{font-size:var(--type-title);line-height:1.3;letter-spacing:-2px;font-weight:600}h3{font-size:var(--type-subtitle);line-height:1.4;font-weight:550}p{color:var(--muted)}a{color:var(--green);text-underline-offset:6px}a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--green);outline-offset:4px}.topline{display:flex;justify-content:space-between;align-items:center;padding-bottom:var(--gap-item);margin-bottom:var(--gap-title);border-bottom:1px solid var(--line);font:var(--type-small)/1.5 var(--mono);color:var(--muted)}.brand{color:var(--green);font-weight:700}.eyebrow{font:var(--type-small)/1.6 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.green{color:var(--green)}.lead{margin-top:var(--gap-item);max-width:1500px}.body{margin-top:var(--gap-title)}.two{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-wide)}.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap-title)}.two>*,.three>*{min-width:0}.foot{margin-top:auto;padding-top:var(--gap-item);display:flex;justify-content:space-between;gap:var(--gap-item);border-top:1px solid var(--line);font-size:var(--type-small);color:var(--muted)}.small{font-size:var(--type-small)}.mono{font-family:var(--mono)}.panel{padding:var(--pad-panel);background:var(--wash);border:1px solid var(--line);border-radius:6px}.panel h3{margin-bottom:var(--gap-item)}.panel p+p{margin-top:var(--gap-item)}.plain{padding-top:var(--gap-item);border-top:2px solid var(--ink)}.plain h3{margin-bottom:var(--gap-item)}.tag{font:var(--type-small)/1.5 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.ascii{font:var(--type-code)/1.6 var(--mono);white-space:pre;color:#354d3c}.code{font:var(--type-code)/1.6 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}.note{font-size:var(--type-small);margin-top:var(--gap-item)}.cover-main{display:grid;grid-template-columns:1.2fr 1fr;gap:var(--gap-wide);align-items:center;flex:1;padding-bottom:var(--gap-title)}.cover-name{font:var(--type-subtitle)/1.5 var(--mono);color:var(--green);margin-bottom:var(--gap-item)}.cover-main p{margin-top:var(--gap-item)}.cover-flow{border-left:1px solid var(--line);padding-left:var(--gap-wide)}.flow-step{display:flex;align-items:baseline;gap:var(--gap-item);padding:var(--gap-item) 0;border-bottom:1px solid var(--line)}.flow-step span{font:var(--type-small)/1.4 var(--mono);color:var(--green)}.flow-step b{font-size:var(--type-body);font-weight:500}.big-number{font:var(--type-hero)/1.25 var(--mono);color:var(--green)}.metric-label{font-size:var(--type-small);margin-top:var(--gap-item)}.compare{width:100%;border-collapse:collapse;font-size:var(--type-small)}.compare th,.compare td{text-align:left;padding:var(--gap-item);border-bottom:1px solid var(--line);vertical-align:top}.compare th{font-size:var(--type-body);font-weight:550}.compare td{color:var(--muted)}.compare td:last-child,.compare th:last-child{background:var(--wash)}.compare td:first-child{color:var(--ink);width:19%}.compare th:nth-child(2){width:40%}.row{display:grid;grid-template-columns:300px 1fr;gap:var(--gap-title);padding:var(--gap-item) 0;border-top:1px solid var(--line)}.row strong{font-weight:550}.list{margin:0;padding-left:var(--pad-panel);color:var(--muted)}.list li+li{margin-top:var(--gap-item)}.citation{display:flex;flex-direction:column;gap:var(--gap-item)}.citation a{font-size:var(--type-body)}.demo{display:block;width:100%;border-radius:4px}
 .toolbar{position:fixed;bottom:0;left:0;right:0;height:66px;border-top:1px solid var(--line);background:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:16px;font-size:13px;z-index:100}.toolbar-group{display:flex;align-items:center;gap:12px}.toolbar button,.toolbar select{font:inherit;border:1px solid var(--line);color:var(--ink);background:white;border-radius:4px;min-height:38px;padding:6px 12px;cursor:pointer}.toolbar button:hover{background:var(--wash)}.toolbar button:disabled{opacity:.35;cursor:default}.toolbar select{max-width:250px}.hint{color:var(--muted)}.toolbar .primary{background:var(--green);color:white;border-color:var(--green)}.toolbar .primary:hover{background:#244f32}.progress{position:fixed;bottom:66px;height:3px;left:0;background:var(--green);z-index:100;width:0}#announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:800px){.toolbar{padding:0 12px;gap:8px}.toolbar-group{gap:6px}.toolbar .hint,.toolbar .reading{display:none}.toolbar select{max-width:155px}.toolbar button{padding:6px 9px}.toolbar .brand{display:none}}@media(max-width:400px){.toolbar select{max-width:115px}#fullscreen{display:none}}@media print{.toolbar,.progress,#announcement{display:none}body{background:white}deck-stage{bottom:0}section{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style>
@@ -17,7 +17,7 @@
 <section data-label="日语字幕流水线">
   <div class="topline"><span class="brand">[m] maijev</span><span>JAPANESE → CHINESE / PROJECT INTRODUCTION</span></div>
   <div class="cover-main"><div><div class="cover-name">maijev</div><h1>语义交给模型。<br><span class="green">时间轴留给程序。</span></h1><p>面向长视频的日语字幕流水线。<br>从词级转录出发，合并字幕、翻译中文，<br>用共享词库连接全片。</p></div><div class="cover-flow"><div class="tag">THE PIPELINE</div><div class="flow-step"><span>01</span><b>MAI 词级语音识别</b></div><div class="flow-step"><span>02</span><b>Gemini 语义合并与翻译</b></div><div class="flow-step"><span>03</span><b>程序恢复时间轴，输出 SRT</b></div><p class="small">可选支线：OCR → Jev → 共享词库</p></div></div>
-  <div class="foot"><span>从早期手工工作流，到可校验的程序编排</span><span>01 / 12</span></div>
+  <div class="foot"><span>从早期手工工作流，到可校验的程序编排</span><span>01 / 13</span></div>
 </section>
 <section data-label="2025 年的字幕工作流">
   <div class="topline"><span class="brand">[m] maijev</span><span>BACKGROUND / 2025</span></div>
@@ -27,14 +27,14 @@
                          合并碎句 + 词库纠错             ▼
                          预翻译分析 + 中文翻译     [ 人工校对 / 调轴 ]</pre></div>
   <div class="body two"><div><h3>已经成立的思路</h3><p class="note">模型不只是逐行翻译，也可以结合上下文与领域词库，修正专有名词、合并过碎的字幕。</p></div><div><h3>仍然依赖人工编排</h3><p class="note">约 30 分钟手动切段，多开窗口比较结果，复制完整 SRT，再检查格式与时间轴。</p></div></div>
-  <div class="foot"><span>依据作者 2025-08-31 视频逐字稿；300 行 / 小时指当时人工做档效率</span><span>02 / 12</span></div>
+  <div class="foot"><span>依据作者 2025-08-31 视频逐字稿；300 行 / 小时指当时人工做档效率</span><span>02 / 13</span></div>
 </section>
 <section data-label="早期瓶颈与工程化处理">
   <div class="topline"><span class="brand">[m] maijev</span><span>FROM MANUAL TO AUTOMATED</span></div>
   <h2>把四个问题，拆成四项独立任务</h2>
   <div class="body"><div class="row"><strong>字幕过碎</strong><p>从词级时间戳构造 atom，单独让模型决定合并分组。</p></div><div class="row"><strong>人名识别错误</strong><p>结合可选 OCR、cast 名单和全文，生成共享词库；允许人工覆盖。</p></div><div class="row"><strong>长段输出不稳定</strong><p>自动分批、校验响应、处理失败，缓存已完成的部分。</p></div><div class="row"><strong>SRT 格式与时间码</strong><p>模型只返回分组或 id + 译文，程序负责时间轴与最终渲染。</p></div></div>
   <p class="note">这些是视频中描述的早期使用体验，不是对今天 Whisper、CapCut 或所有字幕工具的统一评价。</p>
-  <div class="foot"><span>工程化减少重复操作，不取消人工校对</span><span>03 / 12</span></div>
+  <div class="foot"><span>工程化减少重复操作，不取消人工校对</span><span>03 / 13</span></div>
 </section>
 <section data-label="语义与时间轴分开走">
   <div class="topline"><span class="brand">[m] maijev</span><span>ARCHITECTURE</span></div>
@@ -48,7 +48,7 @@
 [ ASR ] → [ Atoms ] ----+                                        v
                        +--- <b>timestamps → validate → render → [ SRT ]</b>
                                TIMING LAYER / CODE</pre></div>
-  <div class="foot"><span>减少 LLM 重写时间码的风险；ASR 自身的时间误差仍需检查</span><span>04 / 12</span></div>
+  <div class="foot"><span>减少 LLM 重写时间码的风险；ASR 自身的时间误差仍需检查</span><span>04 / 13</span></div>
 </section>
 <section data-label="合并与翻译的输出契约">
   <div class="topline"><span class="brand">[m] maijev</span><span>OUTPUT CONTRACTS</span></div>
@@ -66,7 +66,7 @@ end   = atom[1].end</pre><p class="note">检查连续性、重复 id 与静音�
 ]}
 
 原 start + 原 end + 中文译文</pre><p class="note">校验 id 覆盖情况；空译文回退原文，避免静默丢行。</p></article></div>
-  <div class="foot"><span>以上 JSON 与字幕为结构示意，不是质量评测样本</span><span>05 / 12</span></div>
+  <div class="foot"><span>以上 JSON 与字幕为结构示意，不是质量评测样本</span><span>05 / 13</span></div>
 </section>
 <section data-label="全片共享词库">
   <div class="topline"><span class="brand">[m] maijev</span><span>ONE VIDEO / ONE GLOSSARY</span></div>
@@ -83,7 +83,13 @@ end   = atom[1].end</pre><p class="note">检查连续性、重复 id 与静音�
       ┌────┼────┐
       ▼    ▼    ▼
      批次1 批次2 批次N</pre></div><div><div class="plain"><h3>Jev 筛选，pre-pass 归并</h3><p class="note">OCR 由外部工具完成。Jev 区分实体与噪声，再由一次共享调用统一实体写法。</p></div><div class="plain body"><h3>可选接入，逐层降级</h3><p class="note">没有 Jev 就使用 OCR 原文；没有 OCR，可用 --prepass 从全文生成词库。</p></div><div class="plain body"><h3>人工决定最终译名</h3><p class="note">外部术语表或 GUI 人工词库可以修正写法；不内置特定节目、成员词库。</p></div></div></div>
-  <div class="foot"><span>* TVer / Abema 有 cast 数据时可自动触发 pre-pass</span><span>06 / 12</span></div>
+  <div class="foot"><span>* TVer / Abema 有 cast 数据时可自动触发 pre-pass</span><span>06 / 13</span></div>
+</section>
+<section data-label="效果示例">
+  <div class="topline"><span class="brand">[m] maijev</span><span>OUTPUT / DEMO FRAME</span></div>
+  <h2>一闪而过的名条，也在词库范围内</h2>
+  <div class="body two"><div class="panel"><img class="demo" src="assets/demo-frame-name-card.png" alt="烧录帧示例：左下路人名条「夫 啓治さん」被 OCR 捕获并正确译出，底部为中文字幕"></div><div><div class="plain"><h3>画面文字不进音频，靠 OCR 补齐</h3><p class="note">人名条、Logo、屏幕文字由外部 OCR 捕获，经 Jev 分类与 pre-pass 归并进入全片共享词库，翻译批次统一写法。</p></div><div class="plain body"><h3>底部字幕来自主链路</h3><p class="note">ASR 词级转录 → 语义合并 → 翻译，程序恢复时间轴输出 SRT；图中为烧录到画面的最终效果。</p></div></div></div>
+  <div class="foot"><span>assets/demo-frame-name-card.png · 综艺片段实拍帧</span><span>07 / 13</span></div>
 </section>
 <section data-label="GrillMaster 的多模态路线">
   <div class="topline"><span class="brand">[m] maijev</span><span>REFERENCE / GRILLMASTER</span></div>
@@ -99,27 +105,27 @@ end   = atom[1].end</pre><p class="note">检查连续性、重复 id 与静音�
                                               ▼
                                [ index / timecode 校验与修复 ]</pre></div>
   <p class="note">这条路线关注综艺的语气、人物关系和画面语境，也包含 SRT / ASS 与可选润色、烧录、归档环节。</p>
-  <div class="foot"><span>依据本地 GrillMaster 简体 fork 文档，不代表所有上游版本</span><span>07 / 12</span></div>
+  <div class="foot"><span>依据本地 GrillMaster 简体 fork 文档，不代表所有上游版本</span><span>08 / 13</span></div>
 </section>
 <section data-label="两种路线的取舍">
   <div class="topline"><span class="brand">[m] maijev</span><span>DESIGN TRADE-OFFS</span></div>
   <h2>两种路线，侧重不同</h2>
   <table class="compare body"><thead><tr><th>维度</th><th>GrillMaster</th><th>maijev</th></tr></thead><tbody><tr><td>识别与断句</td><td>Scribe v2 → 日文 SRT</td><td>MAI 词级 ASR → atom → 语义合并</td></tr><tr><td>翻译上下文</td><td>字幕 + 音频 + 图片 + 全片简报</td><td>日文行 + 通用规则 + 可选词库</td></tr><tr><td>时间轴责任</td><td>模型输出后，验证并修复结构</td><td>模型不生成 SRT 时间戳</td></tr><tr><td>跨批一致性</td><td>共享人物、语气、梗与摘要</td><td>共享 glossary.md，可人工覆盖</td></tr><tr><td>交付范围</td><td>SRT / ASS，可选后处理与封装</td><td>聚焦日文 / 中文 SRT 与重翻</td></tr></tbody></table>
-  <div class="foot"><span>没有同素材、同模型的对照测试，不宣称翻译质量全面胜出</span><span>08 / 12</span></div>
+  <div class="foot"><span>没有同素材、同模型的对照测试，不宣称翻译质量全面胜出</span><span>09 / 13</span></div>
 </section>
 <section data-label="长视频的缓存与重翻">
   <div class="topline"><span class="brand">[m] maijev</span><span>LONG-FORM WORKFLOW</span></div>
   <h2>长视频，不必每次从头来</h2>
   <div class="body three"><article class="plain"><div class="tag">01 / TRANSCRIBE</div><h3>识别独立切片</h3><p class="note">在静音附近切成约 5 分钟片段。ASR chunk 独立缓存与重试，复用成功结果。</p></article><article class="plain"><div class="tag">02 / RESUME</div><h3>缓存跟着内容走</h3><p class="note">合并、翻译与 pre-pass 的缓存考虑输入、提示词与模型，配置变化不会静默命中旧结果。</p></article><article class="plain"><div class="tag">03 / REVISE</div><h3>改词库，再重翻</h3><p class="note">GUI 中编辑人工词库并保存重翻，复用识别与合并，把新的调用留给翻译。</p></article></div>
   <div class="body panel three"><div><div class="tag">一次运行样本</div><h3>26.5 分钟综艺</h3><p class="note">MAI + Gemini 2.5 Pro<br>包含 pre-pass</p></div><div><div class="big-number">~12 min</div><p class="metric-label">单次总处理时间</p></div><div><div class="big-number">≈ $0.25</div><p class="metric-label">ASR $0.044 + LLM 约 $0.2</p></div></div>
-  <div class="foot"><span>README 单次样本；LLM 费用为估算，不含外部 OCR，不是跨项目跑分</span><span>09 / 12</span></div>
+  <div class="foot"><span>README 单次样本；LLM 费用为估算，不含外部 OCR，不是跨项目跑分</span><span>10 / 13</span></div>
 </section>
 <section data-label="自动化的边界">
   <div class="topline"><span class="brand">[m] maijev</span><span>LIMITATIONS</span></div>
   <h2>结构可校验，内容仍需要判断</h2>
   <div class="body two"><div class="panel"><h3>程序能控制的</h3><ul class="list"><li>字幕分组与 id 对齐的结构检查</li><li>不让 LLM 重写最终时间码</li><li>分阶段缓存与可重复的处理流程</li><li>同一份词库注入各翻译批次</li></ul></div><div class="panel"><h3>仍需人工留意的</h3><ul class="list"><li>ASR 内容、词级时间戳的误差</li><li>人名推断、双关、漫才与视觉笑点</li><li>跨 chunk 的说话人身份不保证一致</li><li>阅读节奏与最终字幕质量</li></ul></div></div>
   <p class="body">当前翻译是纯文本调用：OCR 提供画面文字线索，<br>但不等于让模型理解完整画面、动作与语气。</p>
-  <div class="foot"><span>自动化减少重复劳动，不意味着免校对发布</span><span>10 / 12</span></div>
+  <div class="foot"><span>自动化减少重复劳动，不意味着免校对发布</span><span>11 / 13</span></div>
 </section>
 <section data-label="从一个视频开始">
   <div class="topline"><span class="brand">[m] maijev</span><span>GET STARTED</span></div>
@@ -137,13 +143,13 @@ uv run python -m flows.maijev.pipeline \
 out.srt
 out_llm_ja.srt
 out_zh.srt</pre></div></div>
-  <div class="foot"><span>Homeserver 的工作目录必须设在 /vol1/ 下；GUI 默认仅本地使用，无内置鉴权</span><span>11 / 12</span></div>
+  <div class="foot"><span>Homeserver 的工作目录必须设在 /vol1/ 下；GUI 默认仅本地使用，无内置鉴权</span><span>12 / 13</span></div>
 </section>
 <section data-label="资料与项目入口">
   <div class="topline"><span class="brand">[m] maijev</span><span>READ MORE</span></div>
   <h2>把手工经验，变成可重复的流程</h2><p class="lead">延续早期的合并、纠错与翻译思路，<br>把时间轴、格式和批次管理交给程序。</p>
   <div class="body two"><div class="panel citation"><div class="tag">PROJECT</div><a href="https://github.com/Yoru0908/maijev">github.com/Yoru0908/maijev ↗</a><a href="overview.html">完整阅读版 →</a><a href="tech.html">技术原理与示例 →</a></div><div><h3>资料与对比范围</h3><p class="note">当前能力与样本费用：项目 README。<br>历史背景：2025 年视频及作者提供的逐字稿。<br>GrillMaster：本地简体 fork 的 README / article.md。</p><p class="note"><a href="https://www.bilibili.com/video/BV1tFhCzcEUA/">早期 AI 字幕工作流视频 ↗</a></p><p class="note">早期工具瓶颈不代表当前能力；<br>结构示意与成本样本不构成质量或性能承诺。</p></div></div>
-  <div class="foot"><span>MAI-TRANSCRIBE-2 + GEMINI + OPTIONAL JEV</span><span>12 / 12</span></div>
+  <div class="foot"><span>MAI-TRANSCRIBE-2 + GEMINI + OPTIONAL JEV</span><span>13 / 13</span></div>
 </section>
 </deck-stage>
 <div class="progress" aria-hidden="true"></div>
