@@ -5,6 +5,12 @@ import pytest
 from flows.maijev import auto_publish as ap
 
 
+def test_uploaded_bv_ignores_original_and_rejects_ambiguous():
+    assert ap.uploaded_bv("desc BV1234567890 uploaded BV0987654321", "BV1234567890") == "BV0987654321"
+    assert ap.uploaded_bv("desc BV1234567890", "BV1234567890") is None
+    assert ap.uploaded_bv("BV0987654321 BV1111111111", "BV1234567890") is None
+
+
 def test_enqueue_idempotent_and_requires_real_bv(tmp_path, monkeypatch):
     root = tmp_path / "vol1"
     videos = root / "nhk_downloads"
