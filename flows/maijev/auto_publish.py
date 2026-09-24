@@ -69,6 +69,11 @@ def disk_ok() -> bool:
     return (usage.used / usage.total < .85 and usage.free >= 8 * 1024**3)
 
 
+def uploaded_bv(output: str, original_bv: str) -> str | None:
+    candidates = set(BV.findall(output)) - {original_bv}
+    return next(iter(candidates)) if len(candidates) == 1 else None
+
+
 def duration(path: Path) -> float:
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
@@ -124,14 +129,15 @@ def process(path: Path) -> None:
     try:
         result = subprocess.run(cmd, cwd="/vol1/sakuradio", env=env,
                                 capture_output=True, text=True, timeout=7200)
-        match = BV.search((result.stdout or "") + (result.stderr or ""))
-        if result.returncode != 0 or not match:
+        subtitle_bv = uploaded_bv((result.stdout or "") + (result.stderr or ""),
+                                  job["original_bv"])
+        if result.returncode != 0 or not subtitle_bv:
             raise RuntimeError(f"upload uncertain (exit={result.returncode}); manual review required: "
                                + (result.stderr or "")[-300:])
-        job["subtitle_bv"] = match.group(0)
+        job["subtitle_bv"] = subtitle_bv
         job["status"] = "uploaded"
         save(path, job)
-        print(f"{path.stem}: {match.group(0)}")
+        print(f"{path.stem}: {subtitle_bv}")
     except Exception:
         job["status"] = "review_upload"
         save(path, job)
