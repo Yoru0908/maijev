@@ -18,6 +18,7 @@ def test_all_subtitle_uploads_are_original_content():
                                  "copyright": original_copyright,
                                  "source_url": "https://www.nhk.or.jp/"}, Path("zh.mp4"))
         assert cmd[cmd.index("--title") + 1] == "【中字】 测试"
+        assert cmd[cmd.index("--desc") + 1] == "https://github.com/Yoru0908/maijev"
         assert cmd[cmd.index("--copyright") + 1] == "1"
         assert "--source" not in cmd
 

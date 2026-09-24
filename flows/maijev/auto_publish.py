@@ -83,8 +83,7 @@ def duration(path: Path) -> float:
 
 def upload_command(job: dict, rendered: Path) -> list[str]:
     title = ("【中字】 " + job["title"])[:80]
-    desc = (job["desc"] + "\n中文字幕由自动流程生成。\n原档：https://www.bilibili.com/video/"
-            + job["original_bv"])[:2000]
+    desc = "https://github.com/Yoru0908/maijev"
     cmd = ["/home/srzwyuu/venv/bin/python3", "-m", "biliup", "upload",
            "--title", title, "--desc", desc, "--tag", ",".join(job["tags"]),
            "--tid", str(job["tid"]), "--copyright", "1"]
