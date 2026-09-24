@@ -81,6 +81,19 @@ def duration(path: Path) -> float:
     return float(r.stdout.strip())
 
 
+def upload_command(job: dict, rendered: Path) -> list[str]:
+    title = ("【中字】 " + job["title"])[:80]
+    desc = (job["desc"] + "\n中文字幕由自动流程生成。\n原档：https://www.bilibili.com/video/"
+            + job["original_bv"])[:2000]
+    cmd = ["/home/srzwyuu/venv/bin/python3", "-m", "biliup", "upload",
+           "--title", title, "--desc", desc, "--tag", ",".join(job["tags"]),
+           "--tid", str(job["tid"]), "--copyright", "1"]
+    if job.get("extra_fields"):
+        cmd.extend(["--extra-fields", json.dumps(job["extra_fields"], ensure_ascii=False)])
+    cmd.append(str(rendered))
+    return cmd
+
+
 def process(path: Path) -> None:
     job = json.loads(path.read_text(encoding="utf-8"))
     if job["status"] != "pending":
@@ -112,17 +125,7 @@ def process(path: Path) -> None:
         raise RuntimeError("rendered duration differs from original")
     if not disk_ok():
         raise RuntimeError("disk guard tripped before upload")
-    title = ("【中字】 " + job["title"])[:80]
-    desc = (job["desc"] + "\n中文字幕由自动流程生成。\n原档：https://www.bilibili.com/video/"
-            + job["original_bv"])[:2000]
-    cmd = ["/home/srzwyuu/venv/bin/python3", "-m", "biliup", "upload",
-           "--title", title, "--desc", desc, "--tag", ",".join(job["tags"]),
-           "--tid", str(job["tid"]), "--copyright", str(job["copyright"])]
-    if job["copyright"] == 2 and job["source_url"]:
-        cmd.extend(["--source", job["source_url"]])
-    if job.get("extra_fields"):
-        cmd.extend(["--extra-fields", json.dumps(job["extra_fields"], ensure_ascii=False)])
-    cmd.append(str(rendered))
+    cmd = upload_command(job, rendered)
     # A crash/timeout/network error while submitting is ambiguous. Never blindly retry.
     job["status"] = "submitting"
     save(path, job)
