@@ -112,7 +112,7 @@ def process(path: Path) -> None:
         raise RuntimeError("rendered duration differs from original")
     if not disk_ok():
         raise RuntimeError("disk guard tripped before upload")
-    title = ("【中字】" + job["title"])[:80]
+    title = ("【中字】 " + job["title"])[:80]
     desc = (job["desc"] + "\n中文字幕由自动流程生成。\n原档：https://www.bilibili.com/video/"
             + job["original_bv"])[:2000]
     cmd = ["/home/srzwyuu/venv/bin/python3", "-m", "biliup", "upload",
