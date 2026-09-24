@@ -611,7 +611,7 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 
 原档仍由各 watcher 正常上传并通知；原档有真实 BV 后，新增任务至
 `/vol1/maijev/jobs/`。独立 cron 每 5 分钟执行 `/vol1/maijev/run_worker.sh`，
-只处理 `pending`：字幕→ASS→压制→独立 B 站中字投稿，标题 `【中字】 原标题`，全部以 `copyright=1` 自制投稿（不传转载 `--source`），**不推字幕组群**。原档版权设置不变。
+只处理 `pending`：字幕→ASS→压制→独立 B 站中字投稿，标题 `【中字】 原标题`，简介只放 `https://github.com/Yoru0908/maijev`，全部以 `copyright=1` 自制投稿（不传转载 `--source`），**不推字幕组群**。原档版权设置不变。
 `flows/maijev/styles/yamakawa_ui.tpl` 来源于用户提供的「山川宇衣」样式；
 渲染依赖 `/vol1/maijev/fonts/LXGWWenKaiGB-Medium.ttf`（不会静默替换字体）。
 
