@@ -11,6 +11,17 @@ def test_uploaded_bv_ignores_original_and_rejects_ambiguous():
     assert ap.uploaded_bv("BV0987654321 BV1111111111", "BV1234567890") is None
 
 
+def test_all_subtitle_uploads_are_original_content():
+    for original_copyright in (1, 2):
+        cmd = ap.upload_command({"title": "测试", "desc": "", "original_bv": "BV1234567890",
+                                 "tags": ["山川宇衣"], "tid": 21,
+                                 "copyright": original_copyright,
+                                 "source_url": "https://www.nhk.or.jp/"}, Path("zh.mp4"))
+        assert cmd[cmd.index("--title") + 1] == "【中字】 测试"
+        assert cmd[cmd.index("--copyright") + 1] == "1"
+        assert "--source" not in cmd
+
+
 def test_enqueue_idempotent_and_requires_real_bv(tmp_path, monkeypatch):
     root = tmp_path / "vol1"
     videos = root / "nhk_downloads"
