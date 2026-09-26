@@ -46,7 +46,7 @@ _COST: dict[str, tuple[float, float | None]] = {}
 SAFE_NAME = re.compile(r"[^\w.\-]+")
 MEDIA_EXT = {".mp4", ".mkv", ".mov", ".ts", ".m4a", ".mp3", ".wav", ".flac", ".aac", ".webm"}
 FILES = [
-    "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md",
+    "out_ja_zh.srt", "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md",
     "glossary_user.md", "timings.json", "source_meta.json", "job.json", "gui.log",
 ]
 
@@ -136,6 +136,7 @@ def _snapshot(wd: Path) -> dict:
         "glossary_user": (wd / "glossary_user.md").exists(),
         "zh_batches": _count(wd / "zh_cache", "*.json"),
         "zh": (wd / "out_zh.srt").exists(),
+        "bilingual": (wd / "out_ja_zh.srt").exists(),
         "timings": timings,
         "cost_usd": _asr_cost(wd) if timings else None,
         "files": [n for n in FILES if (wd / n).exists()],

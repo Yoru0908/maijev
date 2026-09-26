@@ -157,9 +157,10 @@ function renderState(s) {
   if (s.cost_usd != null) facts.push(`ASR 费用 <b>$${s.cost_usd.toFixed(4)}</b>`);
   $('.facts', d).innerHTML = facts.map((f) => `<div class="fact">${f}</div>`).join('');
 
-  const main = s.zh ? 'out_zh.srt' : s.ja ? 'out_llm_ja.srt' : s.asr ? 'out.srt' : null;
+  const main = s.bilingual ? 'out_ja_zh.srt' : s.zh ? 'out_zh.srt' : s.ja ? 'out_llm_ja.srt' : s.asr ? 'out.srt' : null;
+  const fileLabels = {'out_ja_zh.srt': '中日双语 SRT', 'out_zh.srt': '中文 SRT', 'out_llm_ja.srt': '日文 SRT', 'out.srt': 'ASR 原始 SRT'};
   $('.files', d).innerHTML = s.files.filter((f) => f.endsWith('.srt') || f === 'timings.json' || f === 'source_meta.json')
-    .map((f) => `<a class="${f === main ? 'main' : ''}" href="/api/jobs/${s.id}/files/${f}?download=1">↓ ${f}</a>`).join('');
+    .map((f) => `<a class="${f === main ? 'main' : ''}" href="/api/jobs/${s.id}/files/${f}?download=1">↓ ${fileLabels[f] || f}</a>`).join('');
   if (main && $('.srt', d).dataset.file !== main + s.mtime) {
     $('.srt', d).dataset.file = main + s.mtime;
     $('.srtTitle', d).textContent = `字幕预览 · ${main}`;
