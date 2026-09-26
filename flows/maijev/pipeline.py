@@ -10,7 +10,7 @@ Stages (all resumable — chunk JSONs and wav slices are cached):
     4. merge     → work_dir/asr.json (ElevenLabs-shaped payload)
     5. srt       → work_dir/out.srt via services.elevenlabs.srt_builder
     6. llm       (optional) LLM merge → out_llm_ja.srt;
-                 --translate adds zh translation → out_zh.srt
+                 --translate adds out_zh.srt and out_ja_zh.srt (bilingual)
 """
 
 from __future__ import annotations
@@ -238,6 +238,11 @@ def run(
             zh_srt = work_dir / "out_zh.srt"
             zh_srt.write_text(render_srt(lines, zh), encoding="utf-8")
             logger.success(f"ZH SRT: {zh_srt}")
+            bilingual_srt = work_dir / "out_ja_zh.srt"
+            bilingual_srt.write_text(
+                render_srt(lines, zh, bilingual=True), encoding="utf-8"
+            )
+            logger.success(f"JA/ZH bilingual SRT: {bilingual_srt}")
             result_path = zh_srt
 
     timings["wall_seconds"] = time.perf_counter() - run_t0
@@ -260,7 +265,7 @@ def main() -> None:
     parser.add_argument("--llm-segment", action="store_true",
                         help="LLM merge pass over utterances")
     parser.add_argument("--translate", action="store_true",
-                        help="translate merged lines to zh (implies segment)")
+                        help="export JA, ZH and bilingual JA/ZH SRT (implies segment)")
     parser.add_argument(
         "--extract-frames",
         action="store_true",

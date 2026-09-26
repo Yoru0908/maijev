@@ -197,7 +197,12 @@ def translate_lines(
 
 
 
-def render_srt(lines: list[MergedLine], texts: list[str]) -> str:
+def render_srt(
+    lines: list[MergedLine], texts: list[str], *, bilingual: bool = False,
+) -> str:
+    """Render aligned cues; bilingual puts source Japanese above translation."""
+    if len(lines) != len(texts):
+        raise ValueError("subtitle lines and translations must have equal lengths")
     def ts(t: float) -> str:
         t = max(0.0, t)
         h, rem = divmod(t, 3600)
@@ -225,5 +230,11 @@ def render_srt(lines: list[MergedLine], texts: list[str]) -> str:
             if not has_content(text):
                 continue
         n += 1
+        if bilingual:
+            # Keep each language on one physical line; a blank line would
+            # terminate an SRT cue. Do not ask the model to rebuild timing.
+            source = " ".join(clean_dialogue(line.text).splitlines()).strip()
+            target = " ".join(text.splitlines()).strip()
+            text = f"{source}\n{target}"
         blocks.append(f"{n}\n{ts(line.start)} --> {ts(line.end)}\n{text}\n")
     return "\n".join(blocks)

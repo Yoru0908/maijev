@@ -41,13 +41,30 @@ https://github.com/Yoru0908/maijev
 - LLM 输出使用 JSON，程序负责校验、按 id 对齐和生成 SRT。
 - 普通短促相槌在进入 merge LLM 前由程序处理，避免翻译阶段产生空字幕行。
 - 不内置任何特定节目、成员或项目词库；需要术语一致性时，可以通过外部文件注入。
-- 可选 Web GUI：浏览器里跑任务、看进度、改词库重翻（`uv sync --extra gui`）。
+- `--translate` 同时导出日文、中文和中日双语 SRT（`out_ja_zh.srt`）：日文在上、中文在下，共用原时间轴，不额外调用模型。已有任务重跑可复用缓存补齐双语文件。
+- 可选 Web GUI：浏览器里跑任务、看进度、改词库重翻、预览与下载中日双语字幕（`uv sync --extra gui`）。
 
 ## 效果示例
 
 ![烧录效果示例：画面左侧人名条「夫 啓治さん」与底部中文字幕](docs/assets/demo-frame-name-card.png)
 
-连画面里一闪而过的路人名条（左下「夫 啓治さん」）都能被 OCR 捕获、经 pre-pass 词库对齐后正确译出；底部中文字幕为 merge → 翻译主链路的输出。
+上图是已有烧录样例，底部译文中的「庆次」仍存在同音异字问题。画面左下的人名条实际写作「夫 啓治さん」；这正是 OCR 可以补充的依据。
+
+[OCR 人名对照测试](docs/ocr-name-comparison.md)复用相同转录和全片上下文：未接入 OCR 时词库写作「目黒慶次」，接入人名条后变为「目黒啓治」，对应中文译文也采用「啓治」。这是一次具体测试，其他 OCR 误读和译名仍需校对。
+
+## GUI、CLI 与 Agent
+
+三种入口共用同一条流水线和任务目录：GUI 适合查看进度、改词库，CLI 适合脚本与自动化，Agent 根据 [maijev-subtitles Skill](skills/maijev-subtitles/SKILL.md) 调用 CLI 完成制作和校对。
+
+```text
+GUI ─────────┐
+CLI ─────────┼→ pipeline → ASR / 合并 / 词库 / 翻译 → 日文、中文、双语 SRT
+Agent Skill → CLI ┘
+```
+
+仓库内的 Agent 可直接读取该 Skill。需要在其他项目中使用时，把 `skills/maijev-subtitles/` 整个目录放入你的 Agent 技能目录，例如 Codex 的 `~/.codex/skills/`；这是操作指引，不会自动安装 maijev 或复制 API 密钥。安装后可请求：
+
+> 使用 $maijev-subtitles 处理这个日语视频，结合已有 OCR 整理词库，校对人名并导出中日双语 SRT。
 
 ## 安装
 
@@ -387,6 +404,7 @@ work_dir/
 ├── out_llm_ja.srt            # LLM 合并后的日文 SRT
 ├── zh_cache/                 # translation LLM 的 per-batch JSON 缓存
 ├── out_zh.srt                # 中文字幕
+├── out_ja_zh.srt             # 日文在上、中文在下的双语字幕
 └── timings.json              # 阶段耗时
 ```
 

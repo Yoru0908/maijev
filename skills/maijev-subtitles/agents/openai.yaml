@@ -1,0 +1,4 @@
+interface:
+  display_name: "maijev 字幕流水线"
+  short_description: "转录日语视频，利用画面文字建立词库并导出中日双语字幕"
+  default_prompt: "使用 $maijev-subtitles 为这个日语视频制作字幕，结合可用的 OCR 线索整理词库并导出中日双语 SRT。"
