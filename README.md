@@ -134,4 +134,4 @@ atom 是带时间的小片段，可以包含多个词。LLM 返回分组或翻�
 | 远程视频、OCR、词库、GUI 服务器模式、故障排查 | [进阶使用](docs/usage.md) |
 | atom、LLM 契约、缓存与目录结构 | [流水线实现与缓存](docs/architecture.md) |
 | 修改 prompt、运行测试和提交代码 | [开发与 Prompt 实验](docs/development.md) |
-| 项目演示与图文介绍 | [幻灯片](docs/index.html) · [阅读版](docs/overview.html) |
+| 项目图文介绍 | [阅读版](docs/overview.html) |
