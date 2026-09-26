@@ -1,11 +1,76 @@
 # maijev
 
-[项目介绍演示](docs/index.html)：12 页白底 16:9 幻灯片，包含 ASCII 流程图、早期字幕工作流的工程化演进，以及与 GrillMaster 的设计取舍对比。下载仓库后可直接用浏览器打开，支持左右键、翻页按钮、页码跳转、全屏及打印为 PDF。偏好连续阅读可打开[完整阅读版](docs/overview.html)。
+把日语音视频整理成可校对的字幕底稿，支持 **浏览器 GUI、命令行和 Agent Skill**。
+
+名字来自微软的 **MAI ASR** 与 **Jev** 模型：MAI 提供词级时间戳，程序先拆成 atom，再由 LLM 按语义合并、翻译。项目主要使用 **Gemini 2.5 Pro**。
+
+**不接 OCR、不配置 Jev，也能直接使用 MAI + LLM 生成基础字幕底稿。** OCR 与 Jev 是用于人名等专有名词的可选增强能力；自动结果仍需人工校对。
+
+## 快速开始：使用 GUI
+
+需要 Python ≥ 3.13、[uv](https://docs.astral.sh/uv/) 和 `ffmpeg` / `ffprobe`。在终端安装并启动，之后在浏览器里操作：
+
+```bash
+git clone https://github.com/Yoru0908/maijev.git
+cd maijev
+uv sync --extra gui
+```
+
+在仓库根目录创建 `.env`，先配置转录和 LLM 即可。以下以 Google AI Studio 接入为例；其他渠道见 [API 配置](#api-配置)。
+
+```dotenv
+OPENROUTER_API_KEY=填写你的_OpenRouter_密钥
+GEMINI_API_KEY=填写你的_Gemini_密钥
+GEMINI_MODEL=gemini-2.5-pro
+```
+
+```bash
+uv run python -m flows.maijev.gui
+```
+
+打开 **http://127.0.0.1:8792**：
+
+1. 填写本地音视频路径，或受支持的视频链接。
+2. 选择「日文合并」获取日文底稿，或「日文 + 中文」同时获取单语和中日双语字幕。
+3. 点击「开始」，在右侧查看进度、日志、字幕预览和下载。
+
+开始时可以留空 **OCR JSON**，不用配置 Jev。「生成自动词库（pre-pass）」仅靠字幕全文也能工作；只想先出基础底稿，可取消勾选。后续可编辑人工词库，再「保存并重翻」。
+
+任务默认保存在仓库的 `runs/` 中。GUI 的更多选项见 [Web GUI](#web-gui可选)。
+
+## 快速开始：使用命令行
+
+使用同一份 `.env` 和依赖，下面两种方式都不需要 OCR 或 Jev：
+
+```bash
+# 日文字幕底稿：MAI 转录 + LLM 语义合并
+uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --llm-segment
+
+# 日文、中文和中日双语字幕；包含语义合并
+uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate
+```
+
+| 输出文件 | 内容 |
+|---|---|
+| `out.srt` | 原始 ASR 的确定性断句基线 |
+| `out_llm_ja.srt` | LLM 合并后的日文底稿 |
+| `out_zh.srt` | 中文字幕（启用翻译时） |
+| `out_ja_zh.srt` | 日文在上、中文在下的双语字幕（启用翻译时） |
+
+后续需要提高译名一致性时，再按需启用：
+
+- `--prepass`：仅用全片字幕生成共享词库，无需 OCR。
+- `--ocr-json "ocr.json"`：接入外部 OCR 的画面文字；配置 Jev 时先筛选实体线索，未配置时用 OCR 原文继续整理词库。
+- Agent：使用仓库中的 [maijev-subtitles Skill](skills/maijev-subtitles/SKILL.md)，操作入口与输出格式相同。
+
+更多说明：[项目演示幻灯片](docs/index.html) · [完整阅读版](docs/overview.html) · [OCR 人名对照](docs/ocr-name-comparison.md)。
+
+## 处理架构
 
 `maijev` 是一条面向长视频的日语字幕流水线：
 
 ```text
-主干（每次运行都执行）：
+基础字幕流程（LLM 合并、翻译按所选模式启用）：
 
   视频/音频（本地文件，或 BV… / ep… / 90-… / v=… 等远程来源 ID 与 URL）
     → （远程来源先经 yt-dlp 下载）
@@ -602,6 +667,8 @@ Git 历史。不开启该变量时，翻译完全使用通用 prompt 和当前�
 
 ## Web GUI（可选）
 
+<a id="web-gui可选"></a>
+
 不想敲命令行、或者视频放在另一台机器上，可以起一个本地 Web 界面：
 
 ```bash
@@ -616,7 +683,7 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 
 - 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
 - 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
-- 下载 `out_zh.srt` / `out_llm_ja.srt` / `out.srt`，页内预览。
+- 下载 `out_ja_zh.srt`（中日双语）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt`；优先预览双语文件，旧任务仍支持单语预览。
 - **人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
   会以 `TRANSLATE_GLOSSARY_PATH` 重跑——ASR / 合并 / pre-pass 全部命中缓存，
   只有翻译重新调用。没有 OCR、没有 Jev 的用户就靠这一步修正译名：先开
