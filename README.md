@@ -1,14 +1,22 @@
 # maijev
 
-把日语音视频整理成可校对的字幕底稿，支持 **浏览器 GUI、命令行和 Agent Skill**。
+把日语音视频整理成**可校对的字幕底稿**，支持浏览器 GUI、命令行和 Agent Skill。
 
-名字来自微软的 **MAI ASR** 与 **Jev** 模型：MAI 提供词级时间戳，程序先拆成 atom，再由 LLM 按语义合并、翻译。项目主要使用 **Gemini 2.5 Pro**。
+名字来自微软的 **MAI ASR** 与 **Jev** 模型，项目主要搭配 **Gemini 2.5 Pro** 使用：
 
-**不接 OCR、不配置 Jev，也能直接使用 MAI + LLM 生成基础字幕底稿。** OCR 与 Jev 是用于人名等专有名词的可选增强能力；自动结果仍需人工校对。
+- **保留时间依据**：利用 MAI 的词级时间戳，由程序拆分带时间的小片段（atom），LLM 按语义分组，程序取回首尾时间。
+- **参考画面写法**：可选外部 OCR + Jev 筛选人名等线索，整理共享词库，减少翻译批次间的译名差异。
+- **方便反复校对**：分阶段缓存；修改词库后复用前序结果重翻，可导出日文、中文和中日双语 SRT。
 
-## 快速开始：使用 GUI
+**基础流程只需 MAI + LLM，OCR 和 Jev 都不是必需项。** “无需修改时间轴”仅指收音良好、语音清晰素材下的使用体验，不代表所有视频都能免调轴；文字、翻译和专有名词仍需人工校对。
 
-需要 Python ≥ 3.13、[uv](https://docs.astral.sh/uv/) 和 `ffmpeg` / `ffprobe`。在终端安装并启动，之后在浏览器里操作：
+[快速开始](#快速开始) · [命令行](#命令行) · [Agent Skill](#agent-skill) · [效果示例](#效果示例) · [详细文档](#详细文档)
+
+## 快速开始
+
+### 1. 安装
+
+需要 Python ≥ 3.13、[uv](https://docs.astral.sh/uv/) 和 `ffmpeg` / `ffprobe`。
 
 ```bash
 git clone https://github.com/Yoru0908/maijev.git
@@ -16,7 +24,11 @@ cd maijev
 uv sync --extra gui
 ```
 
-在仓库根目录创建 `.env`，先配置转录和 LLM 即可。以下以 Google AI Studio 接入为例；其他渠道见 [API 配置](#api-配置)。
+只使用命令行时，可以用 `uv sync` 安装基础依赖。
+
+### 2. 配置 API
+
+在仓库根目录创建 `.env`。下面以 OpenRouter 接入 MAI、Google AI Studio 接入 Gemini 为例：
 
 ```dotenv
 OPENROUTER_API_KEY=填写你的_OpenRouter_密钥
@@ -24,822 +36,103 @@ GEMINI_API_KEY=填写你的_Gemini_密钥
 GEMINI_MODEL=gemini-2.5-pro
 ```
 
+`.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
+
+### 3. 启动 GUI
+
 ```bash
 uv run python -m flows.maijev.gui
 ```
 
 打开 **http://127.0.0.1:8792**：
 
-1. 填写本地音视频路径，或受支持的视频链接。
-2. 选择「日文合并」获取日文底稿，或「日文 + 中文」同时获取单语和中日双语字幕。
-3. 点击「开始」，在右侧查看进度、日志、字幕预览和下载。
+1. 填写本地音视频路径，或 Bilibili、TVer、Abema、YouTube 的受支持链接。
+2. 选择「日文合并」生成日文底稿，或「日文 + 中文」生成单语和双语字幕。
+3. 点击「开始」，查看进度、日志、字幕预览并下载结果。
 
-开始时可以留空 **OCR JSON**，不用配置 Jev。「生成自动词库（pre-pass）」仅靠字幕全文也能工作；只想先出基础底稿，可取消勾选。后续可编辑人工词库，再「保存并重翻」。
+首次使用可以留空 **OCR JSON**。「生成自动词库（pre-pass）」仅靠字幕全文也能工作；只想先出基础底稿，可取消勾选。含出演者信息的远程来源在翻译时仍会自动整理词库。
 
-任务默认保存在仓库的 `runs/` 中。GUI 的更多选项见 [Web GUI](#web-gui可选)。
+需要修正译名时，在右侧人工词库填写 `原文 -> 写法`，点击「保存并重翻」。任务和缓存默认保存在 `runs/`；每个素材应使用独立工作目录。
 
-## 快速开始：使用命令行
+GUI 的服务器模式与访问说明见 [进阶使用](docs/usage.md#web-gui可选)。
 
-使用同一份 `.env` 和依赖，下面两种方式都不需要 OCR 或 Jev：
+## 命令行
+
+使用同一份 `.env`，根据需要选择一种模式：
 
 ```bash
-# 日文字幕底稿：MAI 转录 + LLM 语义合并
+# 日文底稿：MAI 转录 + LLM 语义合并
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --llm-segment
 
-# 日文、中文和中日双语字幕；包含语义合并
+# 日文、中文和中日双语字幕；自动包含语义合并
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate
+
+# 翻译前用全片字幕生成共享词库，不需要 OCR
+uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass
 ```
 
-| 输出文件 | 内容 |
+| 工作目录中的输出 | 内容 |
 |---|---|
-| `out.srt` | 原始 ASR 的确定性断句基线 |
+| `out.srt` | ASR 确定性断句基线 |
 | `out_llm_ja.srt` | LLM 合并后的日文底稿 |
 | `out_zh.srt` | 中文字幕（启用翻译时） |
-| `out_ja_zh.srt` | 日文在上、中文在下的双语字幕（启用翻译时） |
+| `out_ja_zh.srt` | 日文在上、中文在下的双语字幕（启用翻译时，无额外模型调用） |
 
-后续需要提高译名一致性时，再按需启用：
+远程来源、OCR JSON 格式、抽帧和自定义词库见 [进阶使用](docs/usage.md)。完整参数可运行：
 
-- `--prepass`：仅用全片字幕生成共享词库，无需 OCR。
-- `--ocr-json "ocr.json"`：接入外部 OCR 的画面文字；配置 Jev 时先筛选实体线索，未配置时用 OCR 原文继续整理词库。
-- Agent：使用仓库中的 [maijev-subtitles Skill](skills/maijev-subtitles/SKILL.md)，操作入口与输出格式相同。
-
-更多说明：[项目演示幻灯片](docs/index.html) · [完整阅读版](docs/overview.html) · [OCR 人名对照](docs/ocr-name-comparison.md)。
-
-## 处理架构
-
-`maijev` 是一条面向长视频的日语字幕流水线：
-
-```text
-基础字幕流程（LLM 合并、翻译按所选模式启用）：
-
-  视频/音频（本地文件，或 BV… / ep… / 90-… / v=… 等远程来源 ID 与 URL）
-    → （远程来源先经 yt-dlp 下载）
-    → ffmpeg 抽取音频
-    → MAI-Transcribe-2 词级 ASR
-    → 静音、标点、speaker 边界拆 atom
-    → Gemini 合并字幕行
-    → Gemini 翻译中文 ──→ 程序恢复时间轴，输出 SRT
-                          ▲
-                          │ 注入 glossary.md 自动词库（有支线时）
-                          │
-可选支线（译名一致性，逐层降级，缺哪层降哪层）：
-
-  完整链路      --extract-frames → 代表帧 → 外部 OCR → ocr.json
-                → Jev 分类筛选 ──────────┐
-  有 OCR 无 JEV  ocr.json 原文直进 ──────┤→ 纯文本 pre-pass（一次调用：
-  无 OCR         --prepass ──────────────┘   OCR 文字 + 全日文行）
-                                             → glossary.md → 翻译批次共享
+```bash
+uv run python -m flows.maijev.pipeline --help
 ```
 
-项目仓库：
+## Agent Skill
 
-```text
-https://github.com/Yoru0908/maijev
-```
+仓库内的 Agent 可按 [maijev-subtitles Skill](skills/maijev-subtitles/SKILL.md) 调用 CLI。
+需要在其他项目使用时，把 `skills/maijev-subtitles/` 整个目录放入 Agent 的技能目录，例如 Codex 的 `~/.codex/skills/`。
 
-## 特点
+> 使用 $maijev-subtitles 处理这个日语视频，校对人名并导出中日双语 SRT。
 
-- 长音频自动切片，单个 ASR chunk 可以独立重试。
-- ASR、字幕合并和翻译都有本地缓存，支持断点续跑。
-- 时间戳始终由程序掌握，LLM 不生成、不修改时间轴。
-- LLM 只负责语义任务：字幕怎么合并、日文怎么翻译。
-- LLM 输出使用 JSON，程序负责校验、按 id 对齐和生成 SRT。
-- 普通短促相槌在进入 merge LLM 前由程序处理，避免翻译阶段产生空字幕行。
-- 不内置任何特定节目、成员或项目词库；需要术语一致性时，可以通过外部文件注入。
-- `--translate` 同时导出日文、中文和中日双语 SRT（`out_ja_zh.srt`）：日文在上、中文在下，共用原时间轴，不额外调用模型。已有任务重跑可复用缓存补齐双语文件。
-- 可选 Web GUI：浏览器里跑任务、看进度、改词库重翻、预览与下载中日双语字幕（`uv sync --extra gui`）。
+Skill 是操作指引，不会自动安装 maijev 或复制 API 密钥。
 
 ## 效果示例
 
-![烧录效果示例：画面左侧人名条「夫 啓治さん」与底部中文字幕](docs/assets/demo-frame-name-card.png)
+- [字幕视频示例 1](https://www.bilibili.com/video/BV1UHhJ6mEVC/)
+- [字幕视频示例 2](https://www.bilibili.com/video/BV1sbaN66EtN/)
 
-上图是已有烧录样例，底部译文中的「庆次」仍存在同音异字问题。画面左下的人名条实际写作「夫 啓治さん」；这正是 OCR 可以补充的依据。
+![待校对的烧录样例：画面人名条为「夫 啓治さん」，底部字幕仍写作「庆次」](docs/assets/demo-frame-name-card.png)
 
-[OCR 人名对照测试](docs/ocr-name-comparison.md)复用相同转录和全片上下文：未接入 OCR 时词库写作「目黒慶次」，接入人名条后变为「目黒啓治」，对应中文译文也采用「啓治」。这是一次具体测试，其他 OCR 误读和译名仍需校对。
+上图展示了一个需要校对的同音异字问题：人名条是「夫 啓治さん」，字幕却写成了「庆次」。
+[OCR 人名对照测试](docs/ocr-name-comparison.md)复用相同转录和全片上下文：未接入 OCR 时词库写作「目黒慶次」，接入后变为「目黒啓治」，译文随之采用「啓治」。这是一次具体测试，不保证所有人名都能自动纠正，也不修改 ASR 日文原文。
 
-## GUI、CLI 与 Agent
+## 工作原理
 
-三种入口共用同一条流水线和任务目录：GUI 适合查看进度、改词库，CLI 适合脚本与自动化，Agent 根据 [maijev-subtitles Skill](skills/maijev-subtitles/SKILL.md) 调用 CLI 完成制作和校对。
+三种入口共用 `flows.maijev.pipeline` 和同一套任务文件：GUI 启动 CLI 子进程，Agent 也通过 CLI 执行。
 
 ```text
-GUI ─────────┐
-CLI ─────────┼→ pipeline → ASR / 合并 / 词库 / 翻译 → 日文、中文、双语 SRT
-Agent Skill → CLI ┘
+GUI / CLI / Agent Skill
+        ↓
+音视频 → MAI 词级转录 → 程序拆 atom → LLM 分组 → 程序恢复时间轴
+                                                    ↓
+                                              日文字幕底稿
+                                                    ↓
+                                     共享词库 → LLM 翻译 → 中文 / 双语 SRT
 ```
 
-仓库内的 Agent 可直接读取该 Skill。需要在其他项目中使用时，把 `skills/maijev-subtitles/` 整个目录放入你的 Agent 技能目录，例如 Codex 的 `~/.codex/skills/`；这是操作指引，不会自动安装 maijev 或复制 API 密钥。安装后可请求：
+atom 是带时间的小片段，可以包含多个词。LLM 返回分组或翻译文本，程序校验 ID、恢复时间并输出字幕；LLM 不生成最终时间戳。
 
-> 使用 $maijev-subtitles 处理这个日语视频，结合已有 OCR 整理词库，校对人名并导出中日双语 SRT。
+可选词库支线接收外部 OCR：有 Jev 凭据时先筛选线索，没有时使用 OCR 原文；也可以只用字幕全文生成词库。OCR 本身由外部工具完成，`--extract-frames` 仅负责抽帧。更多实现见 [流水线与缓存](docs/architecture.md)。
 
-## 安装
+## 费用
 
-要求：
+费用由 MAI 转录和各 LLM 阶段共同构成，受素材、模型、缓存和重试次数影响。
+历史记录中，26.5 分钟素材使用 Gemini 2.5 Pro，ASR 为 $0.044，LLM 约 $0.2（估算，未逐项记录完整账单）；详见 [费用记录](docs/costs.md)。
 
-- Python `>=3.13`
-- [`uv`](https://docs.astral.sh/uv/)
-- `ffmpeg` 和 `ffprobe`
-- OpenRouter API key，用于 MAI ASR
-- Google Vertex AI Agent Platform key，推荐用于 Gemini merge/translation
+## 详细文档
 
-安装依赖：
-
-```bash
-cd /path/to/maijev
-uv sync
-ffmpeg -version
-ffprobe -version
-```
-
-## API 配置
-
-可以导出环境变量，也可以写入仓库根目录的 `.env`。`.env` 不应提交到公开仓库。
-
-推荐配置：
-
-```bash
-# ASR：OpenRouter speech-to-text
-export OPENROUTER_API_KEY=sk-or-v1-...
-
-# LLM：Google Vertex AI Agent Platform 直连
-export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
-# 也支持 AGENT_PLATFORM_API_KEY
-```
-
-支持的 LLM 配置：
-
-| 环境变量 | 用途 |
+| 想了解什么 | 文档 |
 |---|---|
-| `GEMINI_AGENT_PLATFORM_API_KEY` | Vertex AI Agent Platform |
-| `AGENT_PLATFORM_API_KEY` | Vertex key 兼容别名 |
-| `GEMINI_API_KEY` | Google AI Studio |
-| `OPENROUTER_API_KEY` | 没有 Gemini key 时的 LLM fallback；同时用于 ASR |
-| `GEMINI_AGENT_PLATFORM_BASE_URL` | 可选的 Vertex publisher endpoint |
-| `GEMINI_MODEL` | 全局 Gemini 模型默认值（同 `--model`，默认 `gemini-2.5-pro`） |
-| `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
-| `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
-| `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
-| `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
-| `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
-| `SEGMENT_BATCH_SIZE` | merge 每次调用的 atom 数，默认 `1000` |
-| `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
-| `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
-
-模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。当前默认
-`gemini-2.5-pro`——**该型号 2026 年 10 月下架**，届时默认会切到
-`gemini-3.8-flash`（GA，同价 $0.75/$3.75 per 1M，端点与请求格式不变，
-仅 thinking 参数从 `thinkingBudget` 换成 `thinkingLevel`）。现在就可以
-用 `--model gemini-3.8-flash` 或 `GEMINI_MODEL` 提前切换；想更高质量可用
-`gemini-3.1-pro-preview`。
-
-### 模型选择建议
-
-merge 和 translate **推荐 pro 级模型**。原因不是"上下文更大"——1000 行
-一批只有 30–40k token 输入，pro 和 flash 的上下文都远远够用；真正的差异
-在两处：
-
-- **契约遵循度。** merge 要求 groups 连续不重叠，translate 要求每个 id 恰好
-  出现一次。flash 漏一个 id 就触发整批二分重试，多出的调用往往把单价差
-  吃回去。
-- **译文质量。** 人名汉字保留、敬称处理、语气词省略这些细则，pro 更稳。
-
-batch 大小（`SEGMENT_BATCH_SIZE` / `TRANSLATE_BATCH_SIZE`）受**输出**上限
-约束：1000 行中文 JSON 约 25–35k 输出 token，默认 65536 上限下再翻倍就会
-撞顶。换模型时先看它的最大输出，再调这两个值。跨 batch 的译名一致性由
-`glossary.md` 保证，不依赖把所有行塞进同一批。
-
-非 Gemini 模型（OpenAI / Claude 等）不单独接端点：只配 `OPENROUTER_API_KEY`
-时 LLM 走 OpenRouter chat/completions，`GEMINI_MODEL=anthropic/claude-…`
-这类 OpenRouter 模型名即可切换。prompt 与 JSON 契约按 Gemini 调过，换家
-需自行验证遵循度。
-
-Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选其一：
-
-| 环境变量 | 用途 |
-|---|---|
-| `TYPESAFE_API_KEY` | 官方 TypeSafe API（`api.typesafe.ai`，推荐） |
-| `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | Cloudflare Workers AI 上的 Jev |
-| `JEV_BACKEND` | 两套凭据都在时强制选择：`typesafe` 或 `cloudflare` |
-
-不设 `JEV_BACKEND` 时优先官方 API，缺省回落 Cloudflare。两组凭据都没有时
-`--ocr-json` 仍可用：跳过 JEV 分类，OCR 原始文字直接进 pre-pass。同理
-`--prepass` 可在没有任何 OCR 时单独运行。
-
-LLM 后端选择顺序：
-
-```text
-GEMINI_AGENT_PLATFORM_API_KEY / AGENT_PLATFORM_API_KEY
-  → Vertex AI Agent Platform
-
-GEMINI_API_KEY
-  → Google AI Studio
-
-OPENROUTER_API_KEY
-  → 仅在没有 Gemini 配置时作为 LLM fallback
-```
-
-ASR 始终使用 OpenRouter 的 speech-to-text endpoint，与 LLM 后端相互独立。
-
-## 快速开始
-
-### 只生成确定性基线字幕
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example
-```
-
-输出：
-
-```text
-runs/example/out.srt
-```
-
-### 生成 LLM 断句后的日文字幕
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --llm-segment
-```
-
-输出：
-
-```text
-runs/example/out.srt          # 确定性基线
-runs/example/out_llm_ja.srt   # LLM 合并后的日文字幕
-```
-
-### 生成日文和中文字幕
-
-`--translate` 会自动启用 `--llm-segment`：
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --translate
-```
-
-输出：
-
-```text
-runs/example/out_llm_ja.srt
-runs/example/out_zh.srt
-```
-
-### 远程来源（yt-dlp）
-
-`input` 也可以是平台视频 ID 或完整 URL，经 yt-dlp 下载后继续同一流水线：
-
-| 平台 | 示例 |
-|---|---|
-| Bilibili | `BV1ZArvBaEqL` / `https://www.bilibili.com/video/BV1ZArvBaEqL` |
-| TVer | `ep12345` / `https://tver.jp/episodes/ep12345` |
-| Abema | `90-979_s1_p123` / `https://abema.tv/video/episode/90-979_s1_p123` |
-| YouTube | `v=dQw4w9WgXcQ` / `https://youtu.be/dQw4w9WgXcQ` |
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  BV1ZArvBaEqL \
-  runs/example \
-  --translate
-```
-
-视频下载到 `runs/example/download/`，来源信息写入 `source_meta.json`。
-TVer / Abema 来源还会额外抓取出演者（cast）元数据，作为**权威人名锚点**
-直接进 pre-pass（绕过 Jev 分类）——只要流水线检测到 cast 数据，即使没有
-`--ocr-json` / `--prepass` 也会自动跑一次 pre-pass 生成词库。
-
-### 可选：视觉上下文支线（OCR → pre-pass → 自动词库）
-
-整条支线是可选的，而且**逐层降级**——有什么凭据就走哪一层：
-
-```text
-有 OCR 工具 + Cloudflare/JEV 凭据（完整链路）：
-  ocr.json → Jev 分类筛选（丢弃效果字/对白/噪声）
-           → 筛出的实体进 pre-pass
-
-有 OCR、无 Cloudflare 凭据：
-  ocr.json → OCR 原文不筛选，直进 pre-pass
-
-无 OCR，仅加 --prepass：
-  字幕全文单独进 pre-pass
-
-什么都不加：
-  不初始化 Jev、不跑 pre-pass、不要求任何额外凭据
-```
-
-无论走哪层，终点都是同一次**纯文本 pre-pass**：Gemini 收到 OCR 文字（筛过
-或原文）+ merge 产出的全部日文行，把实体变体归并成 `glossary.md` 自动词库。
-它代替了逐批的内部预分析——每个翻译批次注入的是同一份词库，而不是各自从
-原始 OCR 文字猜测写法。字幕合并（merge）阶段不接收任何 OCR 内容，与 mai-flow
-主干完全一致。
-
-OCR 本身不在本仓库实现：`--extract-frames` 只负责抽帧，OCR 由你自己的工具
-完成，结果经 `--ocr-json` 传回。
-
-#### 稀疏代表帧抽取
-
-使用 `--extract-frames` 按 grillmaster 验证过的策略抽取少量代表帧：
-
-- 跳过开头约 3 秒，避开电视台片头/台标；
-- 每 120 秒抽一帧；
-- 末尾预留 1.5 秒安全距离，避免快定位落在最后 GOP；
-- 等比缩放到最长边 768px；
-- 帧文件和 manifest 缓存到 `work_dir/reference_frames/`。
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --extract-frames \
-  --translate
-```
-
-输出：
-
-```text
-runs/example/reference_frames/
-├── frames/                    # JPEG 帧文件
-└── frames_manifest.json       # 帧时间戳和路径清单
-```
-
-这些代表帧可以送给外部 OCR 工具，再把 OCR 结果通过 `--ocr-json` 传回——有
-Cloudflare 凭据会先经 Jev 分类筛选，没有则原文直进 pre-pass。
-
-输入支持以下三种 JSON 形状：
-
-```json
-[
-  {
-    "track_id": "ocr-001",
-    "text": "武元唯衣",
-    "first_seen": 12.3,
-    "last_seen": 14.8,
-    "ocr_score": 0.98
-  }
-]
-```
-
-也支持 `{"items": [...]}` 或 `{"ocr_tracks": [...]}`。每个 observation 至少需要
-`item_id`、`track_id` 或 `id` 之一，以及非空的 `text`；时间、OCR 分数和 `bbox`
-为可选字段。
-
-```bash
-# 可选：有 Cloudflare 凭据才导出；没有也能跑，OCR 原文直进 pre-pass
-export CLOUDFLARE_ACCOUNT_ID=...
-export CLOUDFLARE_API_TOKEN=...
-
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --ocr-json ocr_observations.json \
-  --translate
-```
-
-该阶段输出：
-
-```text
-runs/example/jev_cache/               # Jev 分类响应缓存
-runs/example/ocr_classification.json  # 每个 OCR observation 的分类
-runs/example/ocr_context.txt          # Jev 筛选结果（调试观察用）
-runs/example/prepass_cache/           # pre-pass 响应缓存
-runs/example/glossary.md              # pre-pass 产出的自动词库
-```
-
-没有 `--ocr-json` 也没有 `--prepass` 时，整条支线不运行，也不需要任何额外
-凭据。
-
-
-### 指定基线 SRT 路径
-
-`--srt` 只控制确定性基线 `out.srt` 的路径；LLM 输出仍写入工作目录。
-
-```bash
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --srt outputs/example_base.srt \
-  --translate
-```
-
-输入可以是视频或音频，实际音频格式由 ffmpeg 读取。建议每个输入文件使用独立的
-工作目录。
-
-## 费用估算
-
-一次 26.5 分钟综艺视频的实测数据（`gemini-2.5-pro` 实测，完整链路含
-pre-pass；换 `gemini-3.8-flash` 价格接近）：
-
-| 阶段 | 用时 | 费用 |
-|---|---:|---:|
-| ASR（MAI-Transcribe-2，OpenRouter） | ~30s | $0.044（精确值） |
-| merge + pre-pass + translate（Gemini） | ~11min | ~$0.2（按 token 估算） |
-| **合计** | **~12min** | **≈ $0.25** |
-
-粗略换算：**一小时视频 ≈ $0.5–0.6**。LLM 部分是估算值（usage 未逐项落盘）；
-换 `gemini-2.5-flash` 会更便宜，换更新的 Pro 会更贵。`timings.json` 记录各
-阶段耗时供复盘。
-
-## 工作目录和缓存
-
-完整运行后的目录结构：
-
-```text
-work_dir/
-├── audio.wav                 # 16kHz、单声道、PCM 音频
-├── chunks/
-│   ├── manifest.json         # chunk 起止时间和文件列表
-│   ├── chunk_00.wav          # 静音点对齐的约 5 分钟音频
-│   ├── chunk_00.wav.json     # MAI ASR 原始响应缓存
-│   └── ...
-├── asr.json                  # 合并后的统一 ASR payload
-├── out.srt                   # 确定性基线 SRT
-├── download/                 # yt-dlp 下载的远程视频（远程来源时）
-├── source_meta.json          # 来源平台 / ID / URL / cast 名单（远程来源时）
-├── reference_frames/         # 稀疏代表帧 + manifest（--extract-frames，可选）
-├── jev_cache/                # Jev OCR 分类的 per-batch JSON 缓存（可选）
-├── ocr_classification.json   # Jev 分类结果（可选）
-├── ocr_context.txt           # Jev 筛选结果（调试观察用，可选）
-├── prepass_cache/            # pre-pass 响应缓存（可选）
-├── glossary.md               # pre-pass 产出的自动词库（可选）
-├── merge_cache/              # merge LLM 的 per-batch JSON 缓存
-├── out_llm_ja.srt            # LLM 合并后的日文 SRT
-├── zh_cache/                 # translation LLM 的 per-batch JSON 缓存
-├── out_zh.srt                # 中文字幕
-├── out_ja_zh.srt             # 日文在上、中文在下的双语字幕
-└── timings.json              # 阶段耗时
-```
-
-缓存原则：
-
-- `chunks/*.wav.json` 存在时，不重复调用对应的 ASR 请求。
-- `merge_cache/` 按 atom 内容 + system prompt + model hash 缓存合并结果。
-- `zh_cache/` 按字幕行内容 + system prompt（含两份术语表）+ model hash 缓存
-  翻译结果。
-- `prepass_cache/` 按 OCR anchor + 日文行 + system prompt + model hash 缓存。
-- prompt、模型或词库变更都会使对应缓存自动失效，无需手动删除。
-- 已完成的 ASR chunk 不需要删除。
-
-只重新翻译：
-
-```bash
-rm -rf runs/example/zh_cache
-uv run python -m flows.maijev.pipeline \
-  input.mp4 \
-  runs/example \
-  --translate
-```
-
-## 流水线阶段
-
-### 1. 音频抽取和切片
-
-`chunker.py` 使用 ffmpeg 抽取 16kHz 单声道 PCM，再使用 `silencedetect` 找静音点，
-把长音频切成约 5 分钟的 chunk。切点优先落在目标时间附近的静音区，并记录每个
-chunk 相对于完整音频的起始偏移。
-
-### 2. MAI-Transcribe-2 ASR
-
-`transcriber.py` 调用：
-
-```text
-POST https://openrouter.ai/api/v1/audio/transcriptions
-model: microsoft/mai-transcribe-2
-```
-
-请求包括：
-
-- `response_format=verbose_json`
-- `timestamp_granularities=["word"]`
-- speaker diarization
-- 可选 phrase list biasing
-- `transcribeStyle=verbatim`
-
-默认 phrase list 为空，不包含任何领域名称。需要专有名词 biasing 时，可以在调用
-`build_payload()` 或 `transcribe_chunk()` 时传入自己的 `phrases` 列表。
-
-ASR 对 429、500、502、503、504 等临时错误自动退避重试，成功响应写入 chunk
-旁边的 JSON 缓存。
-
-### 可选：Jev OCR 分类与纯文本 pre-pass
-
-`--ocr-json` 阶段只读取外部 OCR observation，并把每个 observation 放进 Jev
-`state.items`，通过 `choice` 问题分类为人名、节目名、地点/品牌、普通对白、效果
-文字、噪声或未知。分类响应按完整请求体 hash 缓存到 `jev_cache/`。Jev 后端
-二选一：官方 TypeSafe API（`TYPESAFE_API_KEY`）或 Cloudflare Workers AI
-（`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`）。
-
-随后 `prepass.run_prepass()` 把 anchor 与 merge 产出的全部日文行一起发给
-Gemini 做**一次共享的纯文本调用**，产出 `glossary.md` 自动词库
-（`原文 -> 写法`，与 `TRANSLATE_GLOSSARY_PATH` 同格式）。anchor 来源可以是：
-
-- Jev 筛出的 OCR 实体（有凭据时）；
-- 未筛选的 OCR 原文（无 Jev 凭据时）；
-- 远程来源的 cast 名单（TVer/Abema，权威人名，绕过 Jev 直进）。
-
-这个词库——而不是原始 OCR 文字——注入每个翻译批次，所以全片译名一致。
-
-字幕合并阶段不接收 OCR 内容。没有 `--ocr-json`、没有 cast 数据也没有
-`--prepass` 时，Jev 和 pre-pass 都不会被调用。
-
-
-### 3. Atom 拆分
-
-`segment_llm.build_atoms()` 按 word-level 时间戳切分 atom：
-
-- speaker 切换
-- 词间静音至少 1 秒
-- 硬标点：`。！？?!`
-- 软标点：`、，,：:；;`
-- 单个 atom 超过 48 字时的长度兜底
-
-基础边界来自时间戳，LLM 不参与这一阶段。
-
-#### 短促相槌预处理
-
-普通 `うん` 和重复形式在进入 merge LLM 前确定性处理：
-
-- 同 speaker 且相邻间隙不超过 2 秒：并入邻句。
-- 跨 speaker 且没有同 speaker 邻句：并入时间间隙更小的邻句，并保留 ` -`
-  speaker 分隔符。
-- 不同 speaker 的近距离 `うん / うん` 保留为独立 atom，以显示对话轮换。
-- 超过 2 秒的长停顿不强行合并。
-
-这不是领域词库，而是字幕结构处理，用于避免纯相槌在翻译后变成空字幕。
-
-### 4. LLM 合并
-
-`segment_llm.merge_utterances()` 按 batch 发送 atom。当前配置：
-
-```text
-BATCH_SIZE = 1000 atoms   （SEGMENT_BATCH_SIZE 可调）
-MAX_WORKERS = 2
-CONTEXT_TAIL = 20 atoms
-```
-
-LLM 输入格式：
-
-```text
-id | speaker | gap | text
-```
-
-LLM 只返回合并关系：
-
-```json
-{"groups": [[0, 1], [2, 3, 4]]}
-```
-
-程序收到 groups 后会：
-
-1. 校验 id 是否连续、递增、未重复。
-2. 拒绝跨越过长静音的 group。
-3. 根据 group 首尾 atom 恢复 `start` 和 `end`。
-4. 保留未被 group 使用的 atom。
-
-LLM 不接收也不生成最终 SRT 时间戳。如果 merge batch 连续失败，程序直接报错，
-不会把失败 batch 静默伪装成成功结果。
-
-### 5. 中文翻译
-
-翻译阶段接收已经合并后的日文字幕行：
-
-```text
-id<TAB>日文字幕文本
-```
-
-翻译 LLM 返回：
-
-```json
-{
-  "lines": [
-    {"id": 0, "zh": "中文译文"},
-    {"id": 1, "zh": "下一行译文"}
-  ]
-}
-```
-
-程序按 `id` 对回 `MergedLine`：
-
-```text
-MergedLine.start + MergedLine.end + translated zh
-  → render_srt()
-  → out_zh.srt
-```
-
-翻译 LLM 不负责输出时间轴；时间轴来自 ASR word 时间戳和程序的 atom/group 边界。
-
-翻译配置：
-
-```text
-BATCH_SIZE = 1000 lines   （TRANSLATE_BATCH_SIZE 可调）
-MAX_WORKERS = 2
-maxOutputTokens = 65536
-```
-
-确定性后处理包括：
-
-- 校验每个输入 id 是否都有返回。
-- 清理多余标点和格式。
-- 保留 ` -` speaker 分隔符。
-- 空译文回退到对应原文，避免静默丢行。
-
-## 外部术语表
-
-开源版本不内置任何词库。如果某个项目需要固定人名、作品名或专有名词译法，可以
-在仓库外准备一个普通文本文件：
-
-```text
-原文术语 -> 固定译法
-另一个术语 -> 另一个译法
-```
-
-运行前设置：
-
-```bash
-export TRANSLATE_GLOSSARY_PATH=/path/to/private-glossary.md
-```
-
-程序会把该文件追加到 translation system prompt，且不会把它复制到仓库、缓存或
-Git 历史。不开启该变量时，翻译完全使用通用 prompt 和当前批次上下文。
-
-## Web GUI（可选）
-
-<a id="web-gui可选"></a>
-
-不想敲命令行、或者视频放在另一台机器上，可以起一个本地 Web 界面：
-
-```bash
-uv sync --extra gui
-uv run python -m flows.maijev.gui            # http://127.0.0.1:8792
-uv run python -m flows.maijev.gui --host 0.0.0.0 --runs /vol1/maijev_runs   # 放服务器上
-```
-
-GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipeline` 子进程
-加一个 work_dir，进度、结果、词库全部从 work_dir 里已有的文件推导，pipeline
-本身零改动。功能：
-
-- 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
-- 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
-- 下载 `out_ja_zh.srt`（中日双语）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt`；优先预览双语文件，旧任务仍支持单语预览。
-- **人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
-  会以 `TRANSLATE_GLOSSARY_PATH` 重跑——ASR / 合并 / pre-pass 全部命中缓存，
-  只有翻译重新调用。没有 OCR、没有 Jev 的用户就靠这一步修正译名：先开
-  pre-pass 拿一版自动词库，改掉不满意的条目，重翻即可。
-
-凭据状态在顶栏显示（只显示有无，不显示值）。绑定 `127.0.0.1` 时无鉴权；
-要对外暴露请自己套一层反向代理或 SSH 隧道，服务本身没有账号体系。
-
-## Homeserver 自动中字队列（山川宇衣电话 / NHK）
-
-原档仍由各 watcher 正常上传并通知；原档有真实 BV 后，新增任务至
-`/vol1/maijev/jobs/`。独立 cron 每 5 分钟执行 `/vol1/maijev/run_worker.sh`，
-只处理 `pending`：字幕→ASS→压制→独立 B 站中字投稿，标题 `【中字】 原标题`，简介只放 `https://github.com/Yoru0908/maijev`，全部以 `copyright=1` 自制投稿（不传转载 `--source`），**不推字幕组群**。原档版权设置不变。
-`flows/maijev/styles/yamakawa_ui.tpl` 来源于用户提供的「山川宇衣」样式；
-渲染依赖 `/vol1/maijev/fonts/LXGWWenKaiGB-Medium.ttf`（不会静默替换字体）。
-
-- 任务及状态：`/vol1/maijev/jobs/{phone|nhk}-<ID>.json`；成品/SRT/ASS：`/vol1/maijev/runs/<同名任务>/`。
-- 日志：`/vol1/maijev/logs/auto-publish.log`；备份：`/vol1/maijev/backups/pre-auto-20260925/`。
-- `uploaded` 记录中字 BV；`failed` 不自动重试，需排查后人工改回 `pending`；
-  **`review_upload` 可能已上传成功，不核实 B 站稿件之前禁止改回 `pending`。**
-- 至多 100 任务、单 worker、`/vol1` 水位 85%/剩余 8GiB 停跑；所有工作/日志/缓存均在 `/vol1`。
-- 直接手动试压：`TMPDIR=/vol1/maijev/tmp /vol1/maijev/venv/bin/python -m flows.maijev.burn input.mp4 out_zh.srt zh.mp4 --fontsdir /vol1/maijev/fonts`（在 `/vol1/maijev/app/` 执行，输出也必须在 `/vol1/`）。
-
-## Prompt 实验台
-
-只查看 atom：
-
-```bash
-uv run python -m flows.maijev.seg_lab \
-  runs/example/asr.json \
-  --start 0 \
-  --end 120 \
-  --atoms
-```
-
-调用 merge LLM 测试 0–120 秒：
-
-```bash
-uv run python -m flows.maijev.seg_lab \
-  runs/example/asr.json \
-  --start 0 \
-  --end 120
-```
-
-指定自定义断句 prompt 和模型：
-
-```bash
-uv run python -m flows.maijev.seg_lab \
-  runs/example/asr.json \
-  --system my_segment_prompt.md \
-  --model gemini-2.5-pro
-```
-
-修改 prompt 后，正式 pipeline 运行前应清理对应缓存。
-
-## 故障排查
-
-### `OPENROUTER_API_KEY not set`
-
-```bash
-export OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-### LLM 请求失败或超时
-
-检查 Gemini key、模型名称、网络连接和 `LLM_MAX_OUTPUT_TOKENS`。删除未完成的
-`merge_cache/` 或 `zh_cache/` 后重新执行；已完成的 ASR chunk JSON 不需要删除。
-
-### ASR chunk 遇到 429
-
-代码会自动退避重试。不要同时启动多个相同长视频任务；重新运行时会复用已经成功
-的 chunk 缓存。
-
-### 修改 prompt 后结果没有变化
-
-缓存键已包含 system prompt 和 model，prompt/模型/词库变更会自动失效。如果
-仍想强制重跑：
-
-```bash
-rm -rf runs/example/merge_cache
-rm -rf runs/example/zh_cache
-rm -rf runs/example/prepass_cache
-```
-
-### 日文和中文字幕行数不一致
-
-```bash
-grep -cE '^[0-9]+$' runs/example/out_llm_ja.srt
-grep -cE '^[0-9]+$' runs/example/out_zh.srt
-cat runs/example/timings.json
-```
-
-翻译阶段会对空译文回退到原文。renderer 仍会跳过只含标点、没有可显示文字的块。
-
-## 当前限制
-
-- speaker 编号只保证在单个 ASR 请求范围内有效；跨 chunk 不保证同一个人继续使用
-  同一个编号。严格的全片 speaker identity 需要额外的全局 diarization 或 speaker
-  embedding。
-- LLM 的响应速度和最大输出长度取决于具体模型和后端；`65536` 是配置上限，不
-  代表每次调用一定生成这么多 token。
-- phrase list 需要调用方按领域自行传入，不由仓库维护。
-
-## GitHub 版本管理
-
-建议流程：
-
-```bash
-git status
-git diff --check
-uv run python -m py_compile flows/maijev/*.py
-git add .
-git commit -m "fix: describe change"
-git push origin main
-```
-
-commit message 使用以下前缀：
-
-```text
-feat: 新功能
-fix: 修复行为
-config: 配置变化
-chore: 工程维护
-```
-
-音频、chunk、ASR JSON、LLM cache、`.env` 和生成的 SRT 应放在工作目录，不能提交
-进公开仓库。
-
-## 目录结构
-
-```text
-maijev/
-├── flows/maijev/
-│   ├── chunker.py              # 音频抽取、静音切片
-│   ├── transcriber.py          # OpenRouter MAI ASR
-│   ├── merge.py                # chunk 偏移合并
-│   ├── segment_llm.py          # atomize + merge LLM
-│   ├── segment_prompt.md       # 通用日文断句 prompt
-│   ├── translate_llm.py        # 翻译 LLM + SRT renderer
-│   ├── translate_prompt.md     # 通用日译中翻译 prompt
-│   ├── prepass.py              # 纯文本 pre-pass → glossary.md
-│   ├── prepass_prompt.md       # pre-pass 词库生成 prompt
-│   ├── frames.py               # 稀疏代表帧抽取（OCR/JEV 用）
-│   ├── jev.py                  # TypeSafe / Cloudflare Jev OCR 分类
-│   ├── llm.py                  # Vertex / AI Studio / OpenRouter client
-│   ├── source.py               # yt-dlp 远程来源 + TVer/Abema cast
-│   ├── pipeline.py             # CLI 编排入口
-│   ├── seg_lab.py              # 断句实验台
-│   └── gui/                    # 可选 Web GUI（FastAPI + 单页）
-│       ├── server.py           #   子进程 + SSE + work_dir 文件暴露
-│       └── static/             #   index.html / app.js
-├── docs/                       # 幻灯片 index.html / 阅读版 overview.html / 技术说明 tech.html
-│   ├── deck-stage.js           # 本地幻灯片组件（MIT），无外部依赖
-│   └── intro.html             # 兼容旧入口，自动跳转到演示
-├── services/
-├── tests/                      # 纯函数测试（不调 LLM/ffmpeg）
-├── pyproject.toml
-└── README.md
-```
+| API 后端、模型与环境变量 | [API 与模型配置](docs/configuration.md) |
+| 远程视频、OCR、词库、GUI 服务器模式、故障排查 | [进阶使用](docs/usage.md) |
+| atom、LLM 契约、缓存与目录结构 | [流水线实现与缓存](docs/architecture.md) |
+| 修改 prompt、运行测试和提交代码 | [开发与 Prompt 实验](docs/development.md) |
+| 维护者的自动字幕队列实例 | [Homeserver 部署记录](docs/homeserver-queue.md) |
+| 项目演示与图文介绍 | [幻灯片](docs/index.html) · [阅读版](docs/overview.html) |
