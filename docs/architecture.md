@@ -237,9 +237,7 @@ maijev/
 │   └── gui/                    # 可选 Web GUI（FastAPI + 单页）
 │       ├── server.py           #   子进程 + SSE + work_dir 文件暴露
 │       └── static/             #   index.html / app.js
-├── docs/                       # 幻灯片 index.html / 阅读版 overview.html / 技术说明 tech.html
-│   ├── deck-stage.js           # 本地幻灯片组件（MIT），无外部依赖
-│   └── intro.html             # 兼容旧入口，自动跳转到演示
+├── docs/                       # 使用指南、实现说明、阅读版与技术介绍
 ├── services/
 ├── tests/                      # 纯函数测试（不调 LLM/ffmpeg）
 ├── pyproject.toml
