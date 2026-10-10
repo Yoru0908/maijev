@@ -28,6 +28,15 @@ BATCH_SIZE = int(os.environ.get("TRANSLATE_BATCH_SIZE", "1000"))
 MAX_WORKERS = 2
 
 PROMPT_PATH = Path(__file__).parent / "translate_prompt.md"
+PROFILE_PATHS = {"generic": PROMPT_PATH,
+                 "yamakawa-ui": PROMPT_PATH.parent / "styles/yamakawa_ui_prompt.md"}
+
+
+def translation_profile() -> str:
+    profile = os.environ.get("TRANSLATE_PROFILE", "generic")
+    if profile not in PROFILE_PATHS:
+        raise ValueError(f"unknown translation profile: {profile}")
+    return profile
 
 
 # --- deterministic post-processing (subtitle-group rules) -------------------
@@ -47,7 +56,7 @@ def _clean_zh(text: str) -> str:
     for part in text.split(" -"):
         part = part.replace("，", " ").replace("、", " ")
         part = part.replace("“", "「").replace("”", "」")
-        for ch in _BANNED_CHARS:
+        for ch in (_BANNED_CHARS if translation_profile() == "generic" else ""):
             part = part.replace(ch, "")
         part = part.strip().lstrip("。，、 ").rstrip("。，、 ")
         if part:
@@ -66,17 +75,22 @@ OUTPUT_CONTRACT = """
 
 def _load_system(glossary_path: Path | None = None) -> str:
     parts = []
-    if PROMPT_PATH.exists():
-        style = PROMPT_PATH.read_text(encoding="utf-8").strip()
-        if style:
-            parts.append(style)
+    prompt_path = PROFILE_PATHS[translation_profile()]
+    style = prompt_path.read_text(encoding="utf-8").strip()
+    if style:
+        parts.append(style)
 
     glossary_parts = []
+    base_path = os.environ.get("TRANSLATE_BASE_GLOSSARY_PATH")
+    if base_path:
+        base = Path(base_path).read_text(encoding="utf-8").strip()
+        if base:
+            glossary_parts.append("【保留的基础词库（原人工词库与官方作品补充）】\n" + base)
     if glossary_path and glossary_path.exists():
         auto = glossary_path.read_text(encoding="utf-8").strip()
         if auto:
             glossary_parts.append(
-                "【自动术语表（OCR + pre-pass 生成）】\n" + auto
+                "【自动术语表（OCR + pre-pass 生成；不覆盖基础词库已确认写法）】\n" + auto
             )
     external_path = os.environ.get("TRANSLATE_GLOSSARY_PATH")
     if external_path:

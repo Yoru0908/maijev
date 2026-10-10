@@ -137,6 +137,16 @@ id<TAB>日文字幕
 `glossary.md`——`--ocr-json` 或 `--prepass` 时由 `prepass.py` 对全片做一次
 纯文本 pre-pass 生成的自动词库。仓库本身不提供领域词库。
 
+需要沿用长期积累的人名、节目、曲名词库时，用 `TRANSLATE_BASE_GLOSSARY_PATH`
+指定仓库外的完整基础词库。它始终加载，GUI 的人工修正只覆盖冲突条目，不会
+替换整份基础词库。已确认基础写法优先于自动 pre-pass，任务人工修正优先级最高。
+
+山川宇衣任务可加 `--translation-profile yamakawa-ui`，或在 GUI 选择“山川宇衣”。
+默认 `generic` 沿用通用字幕规则；宇衣模式保留有意义的“嗯、啊”等回应，保持
+JSON/ID/说话人分隔符和时间轴契约。Homeserver 自动队列仅在任务 tags 精确包含
+“山川宇衣”（可有姓名空格）时选择该模式，其余任务使用通用规则。
+Prompt 和全部词库内容进入翻译缓存键，修改后只重翻译，ASR/合并缓存无需清空。
+
 ## 实验台
 
 ```bash

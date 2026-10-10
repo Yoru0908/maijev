@@ -153,6 +153,11 @@
         <button data-mode="zh" class="on">日文 + 中文</button>
       </div>
       <div id="zhOpts">
+        <label>翻译口吻</label>
+        <select id="translationProfile">
+          <option value="generic">通用</option>
+          <option value="yamakawa-ui">山川宇衣</option>
+        </select>
         <label class="check"><input type="checkbox" id="prepass" checked> 生成自动词库（pre-pass）</label>
         <div class="hint">不需要 OCR。用字幕全文归并人名/地名/节目名，翻译后可在右侧手动修正再重翻。</div>
         <label>OCR JSON（可选）</label>
