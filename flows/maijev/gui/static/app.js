@@ -76,7 +76,6 @@ $('#startBtn').onclick = async () => {
     input, mode,
     name: $('#name').value.trim() || null,
     prepass: $('#prepass').checked,
-    translation_profile: $('#translationProfile').value,
     ocr_json: $('#ocr').value.trim() || null,
     extract_frames: $('#frames').checked,
     model: $('#model').value.trim() || null,

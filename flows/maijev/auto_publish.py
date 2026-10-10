@@ -74,11 +74,6 @@ def uploaded_bv(output: str, original_bv: str) -> str | None:
     return next(iter(candidates)) if len(candidates) == 1 else None
 
 
-def job_translation_profile(job: dict) -> str:
-    return ("yamakawa-ui" if any(re.sub(r"\s+", "", str(tag)) == "山川宇衣"
-                               for tag in job.get("tags", [])) else "generic")
-
-
 def duration(path: Path) -> float:
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
@@ -112,8 +107,6 @@ def process(path: Path) -> None:
     env["TMP"] = env["TMPDIR"]
     env["TEMP"] = env["TMPDIR"]
     env["UV_CACHE_DIR"] = str(ROOT / "cache")
-    # Routing uses the explicit member tag, never a fuzzy title/name match.
-    env["TRANSLATE_PROFILE"] = job_translation_profile(job)
     srt = wd / "out_zh.srt"
     rendered = wd / "zh.mp4"
     if not srt.exists() or not srt.stat().st_size:

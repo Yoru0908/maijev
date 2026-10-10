@@ -62,7 +62,6 @@ class JobRequest(BaseModel):
     extract_frames: bool = False
     model: str | None = None
     thinking_level: str | None = None
-    translation_profile: Literal["generic", "yamakawa-ui"] = "generic"
 
 
 class GlossaryBody(BaseModel):
@@ -150,7 +149,6 @@ def _launch(wd: Path, req: JobRequest) -> None:
     cmd = [sys.executable, "-m", "flows.maijev.pipeline", req.input, str(wd)]
     if req.mode == "zh":
         cmd.append("--translate")
-        cmd += ["--translation-profile", req.translation_profile]
         if req.prepass:
             cmd.append("--prepass")
     elif req.mode == "ja":
