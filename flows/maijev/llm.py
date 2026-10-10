@@ -6,7 +6,7 @@ Backend priority:
   - GEMINI_API_KEY → Google AI Studio endpoint
     generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
   - OPENROUTER_API_KEY → OpenRouter chat/completions fallback
-    (model from LLM_MODEL env, default google/gemini-2.5-flash)
+    (model from LLM_MODEL env, default google/gemini-3.8-flash)
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-# 2.5-pro is being retired (Oct 2026); switch this to "gemini-3.8-flash"
-# when that happens — 3.x models take thinkingLevel, not thinkingBudget.
-DEFAULT_MODEL = "gemini-2.5-pro"
+# 2.5-pro retires in Oct 2026. 3.x models take thinkingLevel, not
+# thinkingBudget (see LLM_THINKING_LEVEL).
+DEFAULT_MODEL = "gemini-3.8-flash"
 
 DEFAULT_BASE_URL = (
     "https://aiplatform.googleapis.com/v1beta1/publishers/google/models"
@@ -156,7 +156,10 @@ def _generate_openrouter(
     timeout: int,
     api_key: str,
 ) -> LLMResult:
-    model = model or os.environ.get("LLM_MODEL", "google/gemini-2.5-flash")
+    model = model or os.environ.get("LLM_MODEL", "google/gemini-3.8-flash")
+    # OpenRouter ids carry a vendor prefix; native Gemini ids do not.
+    if "/" not in model:
+        model = f"google/{model}"
     messages = []
     if system:
         messages.append({"role": "system", "content": system})

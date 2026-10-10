@@ -2,7 +2,7 @@
 
 把日语音视频整理成**可校对的字幕底稿**，支持浏览器 GUI、命令行和 Agent Skill。
 
-名字来自微软的 **MAI ASR** 与 **Jev** 模型，项目主要搭配 **Gemini 2.5 Pro** 使用：
+名字来自微软的 **MAI ASR** 与 **Jev** 模型，项目主要搭配 **Gemini 3.8 Flash** 使用：
 
 - **保留时间依据**：利用 MAI 的词级时间戳，由程序拆分带时间的小片段（atom），LLM 按语义分组，程序取回首尾时间。
 - **参考画面写法**：可选外部 OCR + Jev 筛选人名等线索，整理共享词库，减少翻译批次间的译名差异。
@@ -33,7 +33,7 @@ uv sync --extra gui
 ```dotenv
 OPENROUTER_API_KEY=填写你的_OpenRouter_密钥
 GEMINI_API_KEY=填写你的_Gemini_密钥
-GEMINI_MODEL=gemini-2.5-pro
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。

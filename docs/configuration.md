@@ -26,7 +26,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `GEMINI_API_KEY` | Google AI Studio |
 | `OPENROUTER_API_KEY` | 没有 Gemini key 时的 LLM fallback；同时用于 ASR |
 | `GEMINI_AGENT_PLATFORM_BASE_URL` | 可选的 Vertex publisher endpoint |
-| `GEMINI_MODEL` | 全局 Gemini 模型默认值（同 `--model`，默认 `gemini-2.5-pro`） |
+| `GEMINI_MODEL` | 全局 Gemini 模型默认值（同 `--model`，默认 `gemini-3.8-flash`） |
 | `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
@@ -37,12 +37,12 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
 模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。项目主推并默认使用
-`gemini-2.5-pro`。可通过 `--model` 或上述变量切换兼容型号；可用性、价格和
+`gemini-3.8-flash`。可通过 `--model` 或上述变量切换兼容型号；可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
 
 ### 模型选择建议
 
-项目以 Gemini 2.5 Pro 调整断句与翻译 prompt。更换模型时，重点验证：
+断句与翻译 prompt 以 Gemini 3.8 Flash 验证。更换模型时，重点验证：
 
 - 合并关系是否连续、不重叠；翻译是否为每个输入 id 返回一次结果。
 - 人名汉字、敬称和语气的处理是否符合需求。

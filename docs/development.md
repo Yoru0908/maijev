@@ -29,7 +29,7 @@ uv run python -m flows.maijev.seg_lab \
 uv run python -m flows.maijev.seg_lab \
   runs/example/asr.json \
   --system my_segment_prompt.md \
-  --model gemini-2.5-pro
+  --model gemini-3.8-flash
 ```
 
 修改 prompt 或模型后，缓存键自动变化，通常无需手动清理缓存。
