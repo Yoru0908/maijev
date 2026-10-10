@@ -9,12 +9,14 @@ from flows.maijev.segment_llm import MergedLine
 
 @pytest.fixture
 def local_ui(monkeypatch, tmp_path):
-    base, prompt, terms = [tmp_path / p for p in ['base.md', 'ui.txt', 'ui.json']]
+    base, prompt, terms, optimized = [tmp_path / p for p in ['base.md', 'ui.txt', 'ui.json', 'optimized.md']]
     base.write_text('過去曲\n愛MUST BE')
     prompt.write_text('先准确，再像她')
     terms.write_text(json.dumps({'entries': [{'ja': 'ういたん', 'zh': '宇衣碳'}]}))
+    optimized.write_text('行云流水\n上下文理解\n翻译→反思→调整\n\n静态词库\n過去曲')
     for key, value in [('TRANSLATE_BASE_GLOSSARY_PATH', base),
                        ('LOCAL_TRANSLATE_UI_PROMPT_PATH', prompt),
+                       ('LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH', optimized),
                        ('LOCAL_TRANSLATE_UI_GLOSSARY_PATH', terms)]:
         monkeypatch.setenv(key, str(value))
     monkeypatch.delenv('TRANSLATE_GLOSSARY_PATH', raising=False)
@@ -37,6 +39,9 @@ def test_ui_keeps_all_glossary_layers_and_generic_stays_default(local_ui, monkey
     assert tr._load_system().startswith(tr.PROMPT_PATH.read_text().strip())
     system = tr._load_system(auto, profile='yamakawa-ui')
     assert '先准确，再像她' in system and '愛MUST BE' in system
+    for rule in ['行云流水', '上下文理解', '翻译→反思→调整', tr.PROMPT_PATH.read_text().strip()]:
+        assert rule in system
+    assert system.index('行云流水') < system.index('先准确，再像她')
     assert system.index('過去曲') < system.index('画面人名') < system.index('ういたん -> 宇衣碳') < system.index('最终人工修正')
     assert tr._clean_zh('嗯，没关系啊。 -“诶？”', profile='yamakawa-ui') == '嗯 没关系啊 -「诶？」'
     assert tr._clean_zh('嗯，没关系啊。') == '没关系'

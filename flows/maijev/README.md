@@ -149,10 +149,14 @@ id<TAB>日文字幕
 默认仍使用原通用 Prompt。仅在本机 `.env` 配置仓库外的
 `LOCAL_TRANSLATE_UI_PROMPT_PATH`（专用 Prompt）和
 `LOCAL_TRANSLATE_UI_GLOSSARY_PATH`（`entries` 含 `ja`/`zh`/`note` 的人工词表 JSON），
+`LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH`（用户原优化翻译 Prompt），
 且完整基础词库已配置时，GUI 才显示“山川宇衣（本地）”选项。
 CLI 显式传 `--translation-profile yamakawa-ui` 可用于单次翻译；不传则为通用。
 
 两种口吻都加载完整基础词库和最新作品资料。宇衣模式额外加载专用人工词表，
+并完整保留原优化 Prompt 的翻译规则及 maijev 字幕规则，再追加成员口吻补充。
+流水协议、上下文预读、意群衔接和“翻译→反思→调整”继续生效；仅在音频字幕
+输出、ID/时间轴管理、功能性语气词和未确认专名等明确冲突处使用专用适配规则。
 任务人工修正仍具有最终优先级。重翻会保留任务所选口吻；通用与宇衣翻译缓存
 分开，ASR/合并缓存继续复用。宇衣模式保留有意义的回应和语气词，通用清理
 规则保持原样。专用 Prompt/词表不提交、不向服务器同步；自动队列无成员口吻分流。

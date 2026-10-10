@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -36,6 +37,7 @@ def local_ui_available() -> bool:
         os.environ.get(key) and Path(os.environ[key]).is_file()
         for key in ("LOCAL_TRANSLATE_UI_PROMPT_PATH",
                     "LOCAL_TRANSLATE_UI_GLOSSARY_PATH",
+                    "LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH",
                     "TRANSLATE_BASE_GLOSSARY_PATH")
     )
 
@@ -46,7 +48,7 @@ def _profile_prompt_path(profile: str) -> Path:
     if profile != "yamakawa-ui":
         raise ValueError(f"unknown translation profile: {profile}")
     if not local_ui_available():
-        raise ValueError("山川宇衣口吻需要本地专用 Prompt、人工词表和完整基础词库")
+        raise ValueError("山川宇衣口吻需要原优化 Prompt、本地口吻补充、人工词表和完整基础词库")
     return Path(os.environ["LOCAL_TRANSLATE_UI_PROMPT_PATH"])
 
 
@@ -87,6 +89,14 @@ OUTPUT_CONTRACT = """
 def _load_system(glossary_path: Path | None = None, *, profile: str = "generic") -> str:
     parts = []
     prompt_path = _profile_prompt_path(profile)
+    if profile == "yamakawa-ui":
+        original = Path(os.environ["LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH"]).read_text(encoding="utf-8")
+        # The legacy appendix is loaded in full through the base glossary below.
+        appendix = re.search(r"^静态词库[^\S\n]*$", original, re.M)
+        original_rules = original[:appendix.start()] if appendix else original
+        parts.append("【原优化翻译 Prompt：保留全文规则】\n" + original_rules.strip())
+        if PROMPT_PATH.exists():
+            parts.append("【原 maijev 字幕规则】\n" + PROMPT_PATH.read_text(encoding="utf-8").strip())
     if prompt_path.exists():
         style = prompt_path.read_text(encoding="utf-8").strip()
         if style:
