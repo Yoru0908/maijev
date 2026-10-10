@@ -28,6 +28,18 @@ BV = re.compile(r"BV[0-9A-Za-z]{10}")
 load_dotenv(ROOT / "app" / ".env")
 
 
+def phone_video_dirs() -> list[Path]:
+    """Directories phone videos may come from: /vol1/msg-pusher plus any
+    extra ones in MAIJEV_PHONE_VIDEO_DIRS (os.pathsep-separated)."""
+    extra = os.environ.get("MAIJEV_PHONE_VIDEO_DIRS", "")
+    return [Path("/vol1/msg-pusher"), *(Path(d) for d in extra.split(os.pathsep) if d)]
+
+
+def biliup_python() -> str:
+    """Interpreter that has biliup installed (MAIJEV_BILIUP_PYTHON)."""
+    return os.environ.get("MAIJEV_BILIUP_PYTHON", "python3")
+
+
 def save(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".new")
@@ -44,8 +56,7 @@ def enqueue(data: dict) -> bool:
         raise ValueError("invalid input video")
     if source == "nhk" and not video.is_relative_to(Path("/vol1/nhk_downloads")):
         raise ValueError("NHK input outside authoritative download directory")
-    if source == "phone" and not (video.is_relative_to(Path("/vol1/msg-pusher")) or
-                                   video.is_relative_to(Path("/home/user/config/msg-phone-videos"))):
+    if source == "phone" and not any(video.is_relative_to(d) for d in phone_video_dirs()):
         raise ValueError("phone input outside expected directory")
     if not BV.fullmatch(data["original_bv"]):
         raise ValueError("original BV not confirmed; refusing auto-publish")
@@ -84,7 +95,7 @@ def duration(path: Path) -> float:
 def upload_command(job: dict, rendered: Path) -> list[str]:
     title = ("【中字】 " + job["title"])[:80]
     desc = "https://github.com/Yoru0908/maijev"
-    cmd = ["/home/user/venv/bin/python3", "-m", "biliup", "upload",
+    cmd = [biliup_python(), "-m", "biliup", "upload",
            "--title", title, "--desc", desc, "--tag", ",".join(job["tags"]),
            "--tid", str(job["tid"]), "--copyright", "1"]
     if job.get("extra_fields"):

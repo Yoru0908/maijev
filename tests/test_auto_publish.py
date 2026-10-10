@@ -42,3 +42,16 @@ def test_enqueue_idempotent_and_requires_real_bv(tmp_path, monkeypatch):
     assert stored["status"] == "pending"
     with pytest.raises(ValueError):
         ap.enqueue({**payload, "source_id": "EP124", "original_bv": "success"})
+
+
+def test_biliup_python_and_phone_dirs_come_from_environment(monkeypatch):
+    job = {"title": "t", "tags": [], "tid": 21}
+    monkeypatch.delenv("MAIJEV_BILIUP_PYTHON", raising=False)
+    assert ap.upload_command(job, Path("zh.mp4"))[0] == "python3"
+    monkeypatch.setenv("MAIJEV_BILIUP_PYTHON", "/opt/venv/bin/python3")
+    assert ap.upload_command(job, Path("zh.mp4"))[0] == "/opt/venv/bin/python3"
+
+    monkeypatch.delenv("MAIJEV_PHONE_VIDEO_DIRS", raising=False)
+    assert ap.phone_video_dirs() == [Path("/vol1/msg-pusher")]
+    monkeypatch.setenv("MAIJEV_PHONE_VIDEO_DIRS", "/data/a:/data/b")
+    assert ap.phone_video_dirs() == [Path("/vol1/msg-pusher"), Path("/data/a"), Path("/data/b")]
