@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import flows.maijev.segment_llm as seg  # noqa: E402
@@ -55,9 +57,9 @@ def test_build_atoms_splits_on_speaker_gap_and_punct():
     assert atoms[2]["speaker_id"] == "c00_s2"
 
 
-def _fake_llm(groups):
-    """Return a generate_json replacement that emits the given groups."""
-    return lambda *a, **k: {"groups": groups}
+def _fake_llm(segments):
+    """Return a generate_json replacement that emits the given partition."""
+    return lambda *a, **k: {"segments": segments}
 
 
 def test_merge_does_not_dash_same_speaker_across_chunks(monkeypatch):
@@ -96,15 +98,57 @@ def test_merge_rejects_group_bridging_long_pause(monkeypatch):
     assert [l.text for l in lines] == ["前文", "後文"]
 
 
-def test_merge_rejects_invalid_groups(monkeypatch):
-    """Non-contiguous, overlapping, or out-of-range groups are dropped."""
+def test_merge_splits_segment_at_long_pause(monkeypatch):
+    """A segment crossing a long pause is split there, not dropped: the
+    atoms on either side of the pause still merge with their neighbours."""
+    atoms = [
+        _atom("a", 0.0, 0.5, "c00_s1"),
+        _atom("b", 0.6, 1.0, "c00_s1", gap=0.1),
+        _atom("c", 5.0, 5.5, "c00_s1", gap=4.0),
+        _atom("d", 5.6, 6.0, "c00_s1", gap=0.1),
+    ]
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0, 1, 2, 3]]))
+    lines = seg.merge_utterances(atoms, cache_dir=None)
+    assert [l.text for l in lines] == ["ab", "cd"]
+
+
+def test_merge_accepts_singleton_segments(monkeypatch):
     atoms = [
         _atom("a", 0.0, 0.5, "c00_s1"),
         _atom("b", 0.6, 1.0, "c00_s1"),
         _atom("c", 1.1, 1.5, "c00_s1"),
     ]
-    monkeypatch.setattr(
-        seg, "generate_json", _fake_llm([[0, 2], [1, 1], [0, 1, 99]])
-    )
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0], [1, 2]]))
     lines = seg.merge_utterances(atoms, cache_dir=None)
-    assert [l.text for l in lines] == ["a", "b", "c"]
+    assert [l.text for l in lines] == ["a", "bc"]
+
+
+@pytest.mark.parametrize(
+    "segments",
+    [
+        [[0, 1]],            # atom 2 missing
+        [[0], [1], [1, 2]],  # atom 1 twice
+        [[1, 2], [0]],       # out of order
+        [[0, 1, 2, 3]],      # out of range
+        [[0], [], [1, 2]],   # empty segment
+        [["0"], [1, 2]],     # non-int ids
+    ],
+)
+def test_merge_rejects_non_partitions(monkeypatch, segments):
+    """Anything that is not an exact in-order partition fails the batch
+    (after one retry) instead of silently losing or duplicating atoms."""
+    atoms = [
+        _atom("a", 0.0, 0.5, "c00_s1"),
+        _atom("b", 0.6, 1.0, "c00_s1"),
+        _atom("c", 1.1, 1.5, "c00_s1"),
+    ]
+    monkeypatch.setattr(seg, "generate_json", _fake_llm(segments))
+    with pytest.raises(RuntimeError, match="failed after retries"):
+        seg.merge_utterances(atoms, cache_dir=None)
+
+
+def test_merge_rejects_missing_segments_key(monkeypatch):
+    atoms = [_atom("a", 0.0, 0.5, "c00_s1")]
+    monkeypatch.setattr(seg, "generate_json", lambda *a, **k: {"groups": []})
+    with pytest.raises(RuntimeError, match="failed after retries"):
+        seg.merge_utterances(atoms, cache_dir=None)

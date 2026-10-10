@@ -145,18 +145,19 @@ LLM 输入格式：
 id | speaker | gap | text
 ```
 
-LLM 只返回合并关系：
+LLM 返回**完整分区**：每个 atom 恰好出现一次，独立成条的 atom 也单独成组。
 
 ```json
-{"groups": [[0, 1], [2, 3, 4]]}
+{"segments": [[0, 1], [2], [3, 4]]}
 ```
 
-程序收到 groups 后会：
+程序收到 segments 后会：
 
-1. 校验 id 是否连续、递增、未重复。
-2. 拒绝跨越过长静音的 group。
-3. 根据 group 首尾 atom 恢复 `start` 和 `end`。
-4. 保留未被 group 使用的 atom。
+1. 校验所有组按顺序展开后正好是该 batch 的 `start..end-1`；遗漏、重复、乱序或
+   空组都视为无效，重试一次，仍无效则 batch 失败。
+2. 在跨越过长静音（≥ `MAX_MERGE_GAP_S`）处拆开 segment，而不是整组丢弃。
+3. 根据组内首尾 atom 恢复 `start` 和 `end`。
+4. 单 atom 的组不进入缓存，缓存里只有多 atom 的合并组。
 
 LLM 不接收也不生成最终 SRT 时间戳。如果 merge batch 连续失败，程序直接报错，
 不会把失败 batch 静默伪装成成功结果。

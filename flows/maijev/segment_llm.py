@@ -230,51 +230,63 @@ def _format_atom(i: int, a: dict) -> str:
     )
 
 
+def parse_segments(
+    result: Any, atoms: list[dict], start_idx: int, end_idx: int
+) -> list[list[int]]:
+    """Validate a full-partition response and return the merged groups.
+
+    The model must return ``{"segments": [[...], ...]}`` whose groups, read
+    in order, are exactly ``start_idx .. end_idx-1``. Anything else raises
+    ValueError so the caller can retry instead of silently losing atoms.
+    A segment that crosses a pause of ``MAX_MERGE_GAP_S`` or more is split
+    at that pause rather than dropped. Single-atom segments are omitted:
+    the cached result is only the multi-atom groups.
+    """
+    segments = result.get("segments") if isinstance(result, dict) else None
+    if not isinstance(segments, list) or not all(
+        isinstance(s, list) and s and all(isinstance(i, int) for i in s)
+        for s in segments
+    ):
+        raise ValueError("response has no valid 'segments' list")
+    flat = [i for s in segments for i in s]
+    if flat != list(range(start_idx, end_idx)):
+        raise ValueError(
+            f"segments do not cover atoms {start_idx}-{end_idx - 1} "
+            "exactly once in order"
+        )
+
+    groups: list[list[int]] = []
+    for seg in segments:
+        run = [seg[0]]
+        for a, b in zip(seg, seg[1:]):
+            if atoms[b]["start"] - atoms[a]["end"] >= MAX_MERGE_GAP_S:
+                groups.append(run)
+                run = []
+            run.append(b)
+        groups.append(run)
+    return [g for g in groups if len(g) >= 2]
+
+
 def _llm_merge_batch(
     atoms: list[dict], start_idx: int, end_idx: int, model: str
 ) -> list[list[int]]:
-    """Ask the LLM for safe merge groups within one batch."""
+    """Ask the LLM to partition one batch of atoms into subtitle lines."""
     lines = []
     ctx_end = min(end_idx + CONTEXT_TAIL, len(atoms))
     for i in range(start_idx, ctx_end):
         marker = "" if i < end_idx else "  (context)"
         lines.append(_format_atom(i, atoms[i]) + marker)
     prompt = (
-        "对以下 atom 做合并决策。只对不带 (context) 标记的行做决定；"
-        "context 行仅供你判断边界语义。\n\n" + "\n".join(lines)
+        "对以下 atom 做断句：把不带 (context) 标记的行完整划分成字幕，"
+        "每个 id 恰好出现一次。context 行仅供你判断边界语义。\n\n"
+        + "\n".join(lines)
     )
     result = generate_json(
         prompt,
         system=_load_system(),
         model=model,
     )
-    raw_groups = result.get("groups", []) if isinstance(result, dict) else []
-
-    clean: list[list[int]] = []
-    used: set[int] = set()
-    for raw in raw_groups:
-        if not isinstance(raw, list) or len(raw) < 2:
-            continue
-        if not all(isinstance(i, int) for i in raw):
-            continue
-        group = raw
-        if (
-            group != sorted(group)
-            or group != list(range(group[0], group[-1] + 1))
-            or group[0] < start_idx
-            or group[-1] >= end_idx
-            or any(i in used for i in group)
-        ):
-            continue
-        # Never let a group bridge a long pause even if the model asked.
-        if any(
-            atoms[b]["start"] - atoms[a]["end"] >= MAX_MERGE_GAP_S
-            for a, b in zip(group, group[1:])
-        ):
-            continue
-        clean.append(group)
-        used.update(group)
-    return clean
+    return parse_segments(result, atoms, start_idx, end_idx)
 
 
 def _merge_one(

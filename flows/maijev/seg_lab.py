@@ -39,34 +39,22 @@ from flows.maijev.segment_llm import (  # noqa: E402
     PROMPT_PATH,
     _format_atom,
     build_atoms,
+    parse_segments,
 )
 
 
 def llm_merge(atoms: list[dict], system: str) -> list[list[int]]:
     lines = [_format_atom(i, a) for i, a in enumerate(atoms)]
     prompt = (
-        "对以下 atom 做合并决策。只输出需要合并的组。\n\n" + "\n".join(lines)
+        "对以下 atom 做断句：完整划分成字幕，每个 id 恰好出现一次。\n\n"
+        + "\n".join(lines)
     )
     print("=" * 60, "\nPROMPT:\n", prompt, "\n", "=" * 60, sep="")
     result = generate_json(
         prompt, system=system, model=os.environ.get("SEGMENT_MODEL") or None
     )
     print("RAW RESPONSE:\n", json.dumps(result, ensure_ascii=False, indent=1))
-
-    raw_groups = result.get("groups", []) if isinstance(result, dict) else []
-    clean, used = [], set()
-    for g in raw_groups:
-        if (
-            isinstance(g, list)
-            and len(g) >= 2
-            and all(isinstance(i, int) for i in g)
-            and g == list(range(g[0], g[-1] + 1))
-            and 0 <= g[0] and g[-1] < len(atoms)
-            and not any(i in used for i in g)
-        ):
-            clean.append(g)
-            used.update(g)
-    return clean
+    return parse_segments(result, atoms, 0, len(atoms))
 
 
 def render(atoms: list[dict], groups: list[list[int]]) -> str:
