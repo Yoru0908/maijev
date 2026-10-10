@@ -170,14 +170,15 @@
       <label class="check"><input type="checkbox" id="frames"> 抽取稀疏代表帧（供外部 OCR）</label>
       <label>模型</label>
       <div class="row">
-        <input type="text" id="model" list="models" placeholder="默认">
+        <select id="model">
+          <option value="">使用默认模型</option>
+          <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+        </select>
         <select id="thinking" style="width:110px" title="3.x 模型的 thinkingLevel">
           <option value="">思考默认</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option>
         </select>
       </div>
-      <datalist id="models">
-        <option value="gemini-2.5-pro"><option value="gemini-3.1-pro-preview"><option value="gemini-3.8-flash">
-      </datalist>
       <div class="hint">merge / translate 推荐 pro 级：契约遵循度更稳，重试更少。</div>
       <div style="margin-top:16px"><button class="primary" id="startBtn" style="width:100%">开始</button></div>
     </section>

@@ -18,9 +18,21 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-# 2.5-pro retires in Oct 2026. 3.x models take thinkingLevel, not
-# thinkingBudget (see LLM_THINKING_LEVEL).
+# The project only permits these two Gemini models for LLM stages.
+# 3.x models take thinkingLevel (see LLM_THINKING_LEVEL).
 DEFAULT_MODEL = "gemini-3.8-flash"
+SUPPORTED_MODELS = ("gemini-3.1-pro-preview", "gemini-3.8-flash")
+
+
+def validate_model(model: str) -> str:
+    """Reject stale overrides before they can send a paid model request."""
+    normalized = model.removeprefix("google/")
+    if normalized not in SUPPORTED_MODELS:
+        raise ValueError(
+            f"Unsupported LLM model {model!r}; choose "
+            + " or ".join(SUPPORTED_MODELS)
+        )
+    return normalized
 
 DEFAULT_BASE_URL = (
     "https://aiplatform.googleapis.com/v1beta1/publishers/google/models"
@@ -70,12 +82,16 @@ def generate(
         and not agent_key
         and not os.environ.get("GEMINI_API_KEY")
     ):
+        model = validate_model(
+            model or os.environ.get("LLM_MODEL")
+            or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
+        )
         return _generate_openrouter(
             prompt, system=system, model=model,
             json_mode=json_mode, timeout=timeout, api_key=openrouter_key,
         )
 
-    model = model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
+    model = validate_model(model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL)
     body: dict[str, Any] = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -140,7 +156,7 @@ def generate(
 
 def resolve_model(stage_env: str) -> str:
     """Model for one stage: stage env > GEMINI_MODEL > DEFAULT_MODEL."""
-    return (
+    return validate_model(
         os.environ.get(stage_env)
         or os.environ.get("GEMINI_MODEL")
         or DEFAULT_MODEL

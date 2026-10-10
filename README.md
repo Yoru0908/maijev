@@ -38,6 +38,8 @@ GEMINI_MODEL=gemini-3.8-flash
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
 
+断句、自动词库和翻译只允许 `gemini-3.1-pro-preview` 或 `gemini-3.8-flash`，默认后者。GUI 使用固定模型选项；CLI、环境变量及 API 的其他模型值会在开始下载或听写前报错。
+
 ### 3. 启动 GUI
 
 ```bash

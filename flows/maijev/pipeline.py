@@ -42,6 +42,7 @@ from .chunker import (  # noqa: E402
 )
 from .merge import merge_chunks  # noqa: E402
 from .transcriber import transcribe_chunk  # noqa: E402
+from .llm import SUPPORTED_MODELS, resolve_model, validate_model  # noqa: E402
 from .jev import JevClient, load_ocr_items, render_context  # noqa: E402
 from .frames import prepare_reference_frames  # noqa: E402
 
@@ -58,6 +59,12 @@ def run(
     prepass: bool = False,
     translation_profile: str = "generic",
 ) -> Path:
+    if llm_segment or translate:
+        resolve_model("SEGMENT_MODEL")
+        if translate:
+            resolve_model("TRANSLATE_MODEL")
+            if prepass or ocr_json:
+                validate_model(os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL"))
     if translate:
         # Validate the local profile before downloading media or calling ASR.
         from .translate_llm import _load_system
@@ -293,6 +300,8 @@ def main() -> None:
     parser.add_argument(
         "--model",
         default=None,
+        type=validate_model,
+        choices=SUPPORTED_MODELS,
         help="Gemini model for all LLM stages (same as GEMINI_MODEL; "
         "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
     )

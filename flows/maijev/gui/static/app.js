@@ -30,7 +30,7 @@ async function loadEnv() {
     chip(env.llm, 'Gemini', 'GEMINI_AGENT_PLATFORM_API_KEY / GEMINI_API_KEY') +
     chip(!!env.jev, env.jev ? `Jev·${env.jev}` : 'Jev', 'TYPESAFE_API_KEY 或 Cloudflare');
   $('#runsDir').textContent = `runs: ${env.runs}`;
-  $('#model').placeholder = `默认 ${env.default_model}`;
+  $('#model').options[0].textContent = `默认 ${env.default_model}`;
   $('#translationProfileBox').hidden = !env.local_ui_available;
   $('#ocrHint').textContent = env.jev
     ? `有 Jev（${env.jev}）：OCR 先分类筛选再进 pre-pass。`

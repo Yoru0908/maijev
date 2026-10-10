@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT))
 
-from flows.maijev.llm import DEFAULT_MODEL  # noqa: E402
+from flows.maijev.llm import DEFAULT_MODEL, SUPPORTED_MODELS, validate_model  # noqa: E402
 from flows.maijev.translate_llm import _load_system, local_ui_available  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
@@ -148,6 +148,19 @@ def _snapshot(wd: Path) -> dict:
 def _launch(wd: Path, req: JobRequest) -> None:
     if any(p.poll() is None for p in PROCS.values()):
         raise HTTPException(409, "another job is running")
+    if req.mode != "asr":
+        try:
+            if req.model:
+                req.model = validate_model(req.model)
+            fallback = req.model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
+            validate_model(os.environ.get("SEGMENT_MODEL") or fallback)
+            if req.mode == "zh":
+                translation = os.environ.get("TRANSLATE_MODEL") or fallback
+                validate_model(translation)
+                if req.prepass or req.ocr_json:
+                    validate_model(os.environ.get("PREPASS_MODEL") or translation)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     cmd = [sys.executable, "-m", "flows.maijev.pipeline", req.input, str(wd)]
     if req.mode == "zh":
         if req.translation_profile != "generic":
@@ -216,6 +229,7 @@ def env_status():
                    "GEMINI_API_KEY", "OPENROUTER_API_KEY"),
         "jev": jev,
         "default_model": os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
+        "supported_models": list(SUPPORTED_MODELS),
         "runs": str(RUNS),
         "local_ui_available": local_ui_available(),
     }
