@@ -37,6 +37,7 @@ load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT))
 
 from flows.maijev.llm import DEFAULT_MODEL  # noqa: E402
+from flows.maijev.translate_llm import _load_system, local_ui_available  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
 RUNS = ROOT / "runs"
@@ -62,6 +63,7 @@ class JobRequest(BaseModel):
     extract_frames: bool = False
     model: str | None = None
     thinking_level: str | None = None
+    translation_profile: Literal["generic", "yamakawa-ui"] = "generic"
 
 
 class GlossaryBody(BaseModel):
@@ -148,7 +150,13 @@ def _launch(wd: Path, req: JobRequest) -> None:
         raise HTTPException(409, "another job is running")
     cmd = [sys.executable, "-m", "flows.maijev.pipeline", req.input, str(wd)]
     if req.mode == "zh":
+        if req.translation_profile != "generic":
+            try:
+                _load_system(profile=req.translation_profile)
+            except (ValueError, OSError, KeyError) as exc:
+                raise HTTPException(400, str(exc)) from exc
         cmd.append("--translate")
+        cmd += ["--translation-profile", req.translation_profile]
         if req.prepass:
             cmd.append("--prepass")
     elif req.mode == "ja":
@@ -209,6 +217,7 @@ def env_status():
         "jev": jev,
         "default_model": os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "runs": str(RUNS),
+        "local_ui_available": local_ui_available(),
     }
 
 

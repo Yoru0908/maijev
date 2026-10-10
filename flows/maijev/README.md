@@ -144,6 +144,19 @@ id<TAB>日文字幕
 `TRANSLATE_GLOSSARY_PATH` 人工修正继续保留。GUI 重翻不会丢失基础词库。
 词库内容进入翻译缓存键，更新后只重翻译，无需清空 ASR 缓存。
 
+### 本地宇衣口吻
+
+默认仍使用原通用 Prompt。仅在本机 `.env` 配置仓库外的
+`LOCAL_TRANSLATE_UI_PROMPT_PATH`（专用 Prompt）和
+`LOCAL_TRANSLATE_UI_GLOSSARY_PATH`（`entries` 含 `ja`/`zh`/`note` 的人工词表 JSON），
+且完整基础词库已配置时，GUI 才显示“山川宇衣（本地）”选项。
+CLI 显式传 `--translation-profile yamakawa-ui` 可用于单次翻译；不传则为通用。
+
+两种口吻都加载完整基础词库和最新作品资料。宇衣模式额外加载专用人工词表，
+任务人工修正仍具有最终优先级。重翻会保留任务所选口吻；通用与宇衣翻译缓存
+分开，ASR/合并缓存继续复用。宇衣模式保留有意义的回应和语气词，通用清理
+规则保持原样。专用 Prompt/词表不提交、不向服务器同步；自动队列无成员口吻分流。
+
 ## 实验台
 
 ```bash

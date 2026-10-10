@@ -56,7 +56,12 @@ def run(
     ocr_json: Path | None = None,
     extract_frames: bool = False,
     prepass: bool = False,
+    translation_profile: str = "generic",
 ) -> Path:
+    if translate:
+        # Validate the local profile before downloading media or calling ASR.
+        from .translate_llm import _load_system
+        _load_system(profile=translation_profile)
     work_dir.mkdir(parents=True, exist_ok=True)
     run_t0 = time.perf_counter()
     timings: dict[str, float] = {}
@@ -233,6 +238,7 @@ def run(
                 glossary_path=(
                     glossary_path if glossary_path.exists() else None
                 ),
+                profile=translation_profile,
             )
             timings["translate_seconds"] = time.perf_counter() - translate_t0
             zh_srt = work_dir / "out_zh.srt"
@@ -290,6 +296,8 @@ def main() -> None:
         help="Gemini model for all LLM stages (same as GEMINI_MODEL; "
         "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
     )
+    parser.add_argument("--translation-profile", choices=["generic", "yamakawa-ui"],
+                        default="generic", help="explicit local translation profile")
     args = parser.parse_args()
     if args.model:
         os.environ["GEMINI_MODEL"] = args.model
@@ -302,6 +310,7 @@ def main() -> None:
         ocr_json=args.ocr_json,
         extract_frames=args.extract_frames,
         prepass=args.prepass,
+        translation_profile=args.translation_profile,
     )
 
 

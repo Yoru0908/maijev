@@ -31,6 +31,7 @@ async function loadEnv() {
     chip(!!env.jev, env.jev ? `Jev·${env.jev}` : 'Jev', 'TYPESAFE_API_KEY 或 Cloudflare');
   $('#runsDir').textContent = `runs: ${env.runs}`;
   $('#model').placeholder = `默认 ${env.default_model}`;
+  $('#translationProfileBox').hidden = !env.local_ui_available;
   $('#ocrHint').textContent = env.jev
     ? `有 Jev（${env.jev}）：OCR 先分类筛选再进 pre-pass。`
     : '没有 Jev 凭据：OCR 原文直接进 pre-pass，同样可用。';
@@ -76,6 +77,7 @@ $('#startBtn').onclick = async () => {
     input, mode,
     name: $('#name').value.trim() || null,
     prepass: $('#prepass').checked,
+    translation_profile: env.local_ui_available ? $('#translationProfile').value : 'generic',
     ocr_json: $('#ocr').value.trim() || null,
     extract_frames: $('#frames').checked,
     model: $('#model').value.trim() || null,
@@ -140,7 +142,7 @@ function renderState(s) {
     loadGlossary(s.id);
   }
   const job = s.job || {};
-  $('.src', d).textContent = [job.input, job.model && `model=${job.model}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
+  $('.src', d).textContent = [job.input, job.translation_profile === 'yamakawa-ui' && '山川宇衣口吻', job.model && `model=${job.model}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
   $('.cancelBtn', d).disabled = !s.running;
   $('.rerunBtn', d).disabled = s.running || !job.input;
   $('.saveRerun', d).disabled = s.running || !job.input;
