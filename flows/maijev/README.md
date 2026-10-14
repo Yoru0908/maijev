@@ -61,7 +61,6 @@ prompt、模型或词库变更会自动失效，不需要手动删除。ASR chun
 | `merge.py` | 片间偏移合并，生成统一 ASR payload |
 | `segment_llm.py` | 词级 atomize、短促相槌预处理、LLM 合并 |
 | `segment_prompt.md` | 通用日文字幕断句 prompt |
-| `segment_clef.py` | 可选 Clef merge 后端（`SEGMENT_BACKEND=clef`） |
 | `translate_llm.py` | JSON 翻译、后处理、时间轴恢复、SRT renderer |
 | `translate_prompt.md` | 通用日译中翻译 prompt（无领域词库） |
 | `frames.py` | 稀疏代表帧抽取（OCR/JEV 上下文用） |

@@ -289,39 +289,25 @@ def _llm_merge_batch(
     return parse_segments(result, atoms, start_idx, end_idx)
 
 
-SEGMENT_BACKENDS = ("gemini", "clef")
-
-
-def segment_backend() -> str:
-    """Merge backend from SEGMENT_BACKEND (default gemini)."""
-    backend = os.environ.get("SEGMENT_BACKEND", "gemini").strip().lower() or "gemini"
-    if backend not in SEGMENT_BACKENDS:
-        raise ValueError(
-            f"Unsupported SEGMENT_BACKEND {backend!r}; choose "
-            + " or ".join(SEGMENT_BACKENDS)
-        )
-    return backend
-
-
-def _cached_batch(
-    atoms: list[dict],
-    start: int,
-    end: int,
-    cache_dir: Path | None,
-    tag: str,
-    run,
+def _merge_one(
+    atoms: list[dict], start: int, end: int, cache_dir: Path | None
 ) -> list[list[int]]:
-    """Cache hit, or ``run()`` with one retry. Failed batches are never
-    persisted, so re-runs retry just that batch."""
+    """One batch: cache hit, or LLM call with one retry. Failed batches
+    are never persisted, so re-runs retry just that batch."""
     # Cache key covers the atoms this batch decides on — atomize changes
     # shift indices, so an index-keyed cache would silently misapply.
-    # ``tag`` (prompt + model) is part of the key so prompt/model changes
-    # invalidate old batches automatically.
+    # The system prompt and model are part of the key so prompt/model
+    # changes invalidate old batches automatically.
+    model = resolve_model("SEGMENT_MODEL")
     key_input = "\n".join(
         _format_atom(i, atoms[i]) for i in range(start, end)
     )
     key = hashlib.sha1(
-        (key_input + "\n<system>\n" + tag).encode()
+        (
+            key_input
+            + "\n<system>\n" + _load_system()
+            + "\n<model>\n" + model
+        ).encode()
     ).hexdigest()[:16]
     cache_file = cache_dir / f"batch_{key}.json" if cache_dir else None
     if cache_file and cache_file.exists():
@@ -330,7 +316,7 @@ def _cached_batch(
     batch_groups = None
     for attempt in (1, 2):
         try:
-            batch_groups = run()
+            batch_groups = _llm_merge_batch(atoms, start, end, model)
             break
         except Exception as e:
             logger.warning(
@@ -347,29 +333,6 @@ def _cached_batch(
             json.dumps(batch_groups, ensure_ascii=False), encoding="utf-8"
         )
     return batch_groups
-
-
-def _merge_one(
-    atoms: list[dict], start: int, end: int, cache_dir: Path | None
-) -> list[list[int]]:
-    """One batch via the configured backend. A failed Clef batch falls
-    back to Gemini so the job still finishes."""
-    if segment_backend() == "clef":
-        from .segment_clef import CACHE_TAG, clef_merge_batch
-
-        try:
-            return _cached_batch(
-                atoms, start, end, cache_dir, CACHE_TAG,
-                lambda: clef_merge_batch(atoms, start, end),
-            )
-        except RuntimeError as e:
-            logger.warning(f"Clef merge {start}-{end} failed, using Gemini: {e}")
-    model = resolve_model("SEGMENT_MODEL")
-    return _cached_batch(
-        atoms, start, end, cache_dir,
-        _load_system() + "\n<model>\n" + model,
-        lambda: _llm_merge_batch(atoms, start, end, model),
-    )
 
 
 def merge_utterances(
