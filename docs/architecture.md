@@ -159,6 +159,11 @@ LLM 返回**完整分区**：每个 atom 恰好出现一次，独立成条的 at
 3. 根据组内首尾 atom 恢复 `start` 和 `end`。
 4. 单 atom 的组不进入缓存，缓存里只有多 atom 的合并组。
 
+`SEGMENT_BACKEND=clef` 时，每个 batch 改由 `segment_clef.py` 判断：对每个
+短停顿边界问 Clef join / break，把连续的 join 串成组，输出与上面相同的
+合并组格式，后续缓存、时间戳恢复与 ` -` 分隔符不变。缓存键包含后端的
+prompt 与模型，两种后端的结果互不覆盖；Clef batch 失败时退回 Gemini。
+
 LLM 不接收也不生成最终 SRT 时间戳。如果 merge batch 连续失败，程序直接报错，
 不会把失败 batch 静默伪装成成功结果。
 
@@ -230,6 +235,7 @@ maijev/
 │   ├── prepass.py              # 纯文本 pre-pass → glossary.md
 │   ├── prepass_prompt.md       # pre-pass 词库生成 prompt
 │   ├── frames.py               # 稀疏代表帧抽取（OCR/JEV 用）
+│   ├── segment_clef.py         # 可选 Clef merge 后端（边界 join/break）
 │   ├── jev.py                  # TypeSafe / Cloudflare Jev OCR 分类
 │   ├── llm.py                  # Vertex / AI Studio / OpenRouter client
 │   ├── source.py               # yt-dlp 远程来源 + TVer/Abema cast

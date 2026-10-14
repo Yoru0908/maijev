@@ -21,7 +21,7 @@ from typing import Any
 # The project only permits these two Gemini models for LLM stages.
 # 3.x models take thinkingLevel (see LLM_THINKING_LEVEL).
 DEFAULT_MODEL = "gemini-3.8-flash"
-SUPPORTED_MODELS = ("gemini-3.1-pro-preview", "gemini-3.8-flash")
+SUPPORTED_MODELS = ("gemini-3.8-flash", "gemini-4-argon")
 
 
 def validate_model(model: str) -> str:

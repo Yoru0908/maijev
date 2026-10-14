@@ -33,12 +33,21 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `SEGMENT_BATCH_SIZE` | merge 每次调用的 atom 数，默认 `1000` |
+| `SEGMENT_BACKEND` | merge 后端：`gemini`（默认）或 `clef`（见下文） |
 | `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
 模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。项目主推并默认使用
-`gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.1-pro-preview` 或 `gemini-3.8-flash`；其他值在下载/听写前报错。可用性、价格和
+`gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash` 或 `gemini-4-argon`；其他值在下载/听写前报错。可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
+
+`gemini-4-argon` 只在 Vertex 的 global location 提供，默认端点会返回 404。
+使用 Argon 时把 `GEMINI_AGENT_PLATFORM_BASE_URL` 设为带项目的 global 地址
+（3.8 Flash 在该地址同样可用）：
+
+```bash
+export GEMINI_AGENT_PLATFORM_BASE_URL=https://aiplatform.googleapis.com/v1beta1/projects/<项目ID或编号>/locations/global/publishers/google/models
+```
 
 ### 模型选择建议
 
@@ -55,6 +64,21 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 时 LLM 走 OpenRouter chat/completions，`GEMINI_MODEL=anthropic/claude-…`
 这类 OpenRouter 模型名即可切换。prompt 与 JSON 契约按 Gemini 调过，换家
 需自行验证遵循度。
+
+### merge 后端：Clef（可选）
+
+`SEGMENT_BACKEND=clef` 时，merge 阶段改用 Cloudflare Workers AI 的
+`@cf/cloudflare/clef` 决策模型，凭据与 Jev 共用
+（`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`）。Clef 不生成文本，
+而是对每个相邻 atom 边界回答 join / break 的概率，`p(join) ≥ 0.5` 即合并；
+长停顿（≥ `MAX_MERGE_GAP_S`）的边界不提问、永不合并。每次请求最多 64 个
+边界，前后各带 20 个 atom 作只读上下文。某个 batch 重试后仍失败时，该 batch
+自动退回 Gemini，任务不中断。
+
+参考数据（2 段新标注片段 + 1 段 34 分钟全片，样本有限）：合并准确率与
+3.8 Flash 相当，孤立半句更少；34 分钟视频约 6–9 秒（Gemini 约 40–90 秒），
+费用约 $0.10 / 小时视频。判断结果会受分块位置影响，接入真实任务前建议并行
+对比。
 
 Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选其一：
 

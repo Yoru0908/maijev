@@ -61,6 +61,9 @@ def run(
 ) -> Path:
     if llm_segment or translate:
         resolve_model("SEGMENT_MODEL")
+        from .segment_llm import segment_backend
+
+        segment_backend()
         if translate:
             resolve_model("TRANSLATE_MODEL")
             if prepass or ocr_json:
