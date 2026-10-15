@@ -30,7 +30,8 @@ async function loadEnv() {
     chip(env.llm, 'Gemini', 'GEMINI_AGENT_PLATFORM_API_KEY / GEMINI_API_KEY') +
     chip(!!env.jev, env.jev ? `Jev·${env.jev}` : 'Jev', 'TYPESAFE_API_KEY 或 Cloudflare');
   $('#runsDir').textContent = `runs: ${env.runs}`;
-  $('#model').options[0].textContent = `默认 ${env.default_model}`;
+  $('#segmentModel').options[0].textContent = `默认 ${env.segment_default}`;
+  $('#translateModel').options[0].textContent = `默认 ${env.translate_default}`;
   $('#translationProfileBox').hidden = !env.local_ui_available;
   $('#ocrHint').textContent = env.jev
     ? `有 Jev（${env.jev}）：OCR 先分类筛选再进 pre-pass。`
@@ -80,7 +81,8 @@ $('#startBtn').onclick = async () => {
     translation_profile: env.local_ui_available ? $('#translationProfile').value : 'generic',
     ocr_json: $('#ocr').value.trim() || null,
     extract_frames: $('#frames').checked,
-    model: $('#model').value.trim() || null,
+    segment_model: $('#segmentModel').value || null,
+    translate_model: $('#translateModel').value || null,
     thinking_level: $('#thinking').value || null,
   };
   try {
@@ -142,7 +144,7 @@ function renderState(s) {
     loadGlossary(s.id);
   }
   const job = s.job || {};
-  $('.src', d).textContent = [job.input, job.translation_profile === 'yamakawa-ui' && '山川宇衣口吻', job.model && `model=${job.model}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
+  $('.src', d).textContent = [job.input, job.translation_profile === 'yamakawa-ui' && '山川宇衣口吻', job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
   $('.cancelBtn', d).disabled = !s.running;
   $('.rerunBtn', d).disabled = s.running || !job.input;
   $('.saveRerun', d).disabled = s.running || !job.input;

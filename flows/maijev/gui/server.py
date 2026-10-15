@@ -62,6 +62,8 @@ class JobRequest(BaseModel):
     ocr_json: str | None = None
     extract_frames: bool = False
     model: str | None = None
+    segment_model: str | None = None
+    translate_model: str | None = None
     thinking_level: str | None = None
     translation_profile: Literal["generic", "yamakawa-ui"] = "generic"
 
@@ -150,12 +152,14 @@ def _launch(wd: Path, req: JobRequest) -> None:
         raise HTTPException(409, "another job is running")
     if req.mode != "asr":
         try:
-            if req.model:
-                req.model = validate_model(req.model)
+            for field in ("model", "segment_model", "translate_model"):
+                if getattr(req, field):
+                    setattr(req, field, validate_model(getattr(req, field)))
             fallback = req.model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
-            validate_model(os.environ.get("SEGMENT_MODEL") or fallback)
+            validate_model(req.segment_model or os.environ.get("SEGMENT_MODEL") or fallback)
             if req.mode == "zh":
-                translation = os.environ.get("TRANSLATE_MODEL") or fallback
+                translation = (req.translate_model
+                               or os.environ.get("TRANSLATE_MODEL") or fallback)
                 validate_model(translation)
                 if req.prepass or req.ocr_json:
                     validate_model(os.environ.get("PREPASS_MODEL") or translation)
@@ -180,6 +184,10 @@ def _launch(wd: Path, req: JobRequest) -> None:
         cmd.append("--extract-frames")
     if req.model:
         cmd += ["--model", req.model]
+    if req.segment_model:
+        cmd += ["--segment-model", req.segment_model]
+    if req.translate_model and req.mode == "zh":
+        cmd += ["--translate-model", req.translate_model]
 
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     if req.thinking_level:
@@ -229,6 +237,10 @@ def env_status():
                    "GEMINI_API_KEY", "OPENROUTER_API_KEY"),
         "jev": jev,
         "default_model": os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
+        "segment_default": os.environ.get("SEGMENT_MODEL")
+        or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
+        "translate_default": os.environ.get("TRANSLATE_MODEL")
+        or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "supported_models": list(SUPPORTED_MODELS),
         "runs": str(RUNS),
         "local_ui_available": local_ui_available(),

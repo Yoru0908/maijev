@@ -36,7 +36,10 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
-模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。项目主推并默认使用
+模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。合并和翻译可以用不同模型：
+`.env` 里分别设 `SEGMENT_MODEL` / `TRANSLATE_MODEL`，或单次运行时用 CLI 的
+`--segment-model` / `--translate-model`、GUI 的「合并模型」「翻译模型」；后两者会覆盖
+`.env` 的阶段设置。pre-pass 未单独设置 `PREPASS_MODEL` 时跟随翻译模型。项目主推并默认使用
 `gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash`、`gemini-4-argon` 或 `gemini-3.1-pro-preview`；其他值在下载/听写前报错。可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
 

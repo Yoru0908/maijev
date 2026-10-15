@@ -305,11 +305,24 @@ def main() -> None:
         help="Gemini model for all LLM stages (same as GEMINI_MODEL; "
         "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
     )
+    for stage in ("segment", "translate"):
+        parser.add_argument(
+            f"--{stage}-model",
+            default=None,
+            type=validate_model,
+            choices=SUPPORTED_MODELS,
+            help=f"model for the {stage} stage only; overrides "
+            f"{stage.upper()}_MODEL from .env",
+        )
     parser.add_argument("--translation-profile", choices=["generic", "yamakawa-ui"],
                         default="generic", help="explicit local translation profile")
     args = parser.parse_args()
     if args.model:
         os.environ["GEMINI_MODEL"] = args.model
+    if args.segment_model:
+        os.environ["SEGMENT_MODEL"] = args.segment_model
+    if args.translate_model:
+        os.environ["TRANSLATE_MODEL"] = args.translate_model
     run(
         args.input,
         args.work_dir,
