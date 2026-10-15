@@ -314,19 +314,22 @@ def _merge_one(
         return json.loads(cache_file.read_text(encoding="utf-8"))
 
     batch_groups = None
+    last_err: Exception | None = None
     for attempt in (1, 2):
         try:
             batch_groups = _llm_merge_batch(atoms, start, end, model)
             break
         except Exception as e:
+            last_err = e
             logger.warning(
                 f"segment batch {start}-{end} attempt {attempt} "
                 f"failed: {e}"
             )
     if batch_groups is None:
         raise RuntimeError(
-            f"segment batch {start}-{end} failed after retries"
-        )
+            f"segment batch {start}-{end} failed after retries "
+            f"(model={model}): {type(last_err).__name__}: {last_err}"
+        ) from last_err
     if cache_file:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(
