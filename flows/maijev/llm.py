@@ -18,10 +18,10 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-# The project only permits these two Gemini models for LLM stages.
+# The project only permits these Gemini models for LLM stages.
 # 3.x models take thinkingLevel (see LLM_THINKING_LEVEL).
 DEFAULT_MODEL = "gemini-3.8-flash"
-SUPPORTED_MODELS = ("gemini-3.8-flash", "gemini-4-argon")
+SUPPORTED_MODELS = ("gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-4-argon")
 
 
 def validate_model(model: str) -> str:
@@ -30,7 +30,7 @@ def validate_model(model: str) -> str:
     if normalized not in SUPPORTED_MODELS:
         raise ValueError(
             f"Unsupported LLM model {model!r}; choose "
-            + " or ".join(SUPPORTED_MODELS)
+            + " / ".join(SUPPORTED_MODELS)
         )
     return normalized
 

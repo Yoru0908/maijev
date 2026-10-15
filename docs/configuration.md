@@ -37,7 +37,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
 模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。项目主推并默认使用
-`gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash` 或 `gemini-4-argon`；其他值在下载/听写前报错。可用性、价格和
+`gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash`、`gemini-4-argon` 或 `gemini-3.1-pro-preview`；其他值在下载/听写前报错。可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
 
 `gemini-4-argon` 只在 Vertex 的 global location 提供，默认端点会返回 404。

@@ -19,6 +19,7 @@ import flows.maijev.llm as llm  # noqa: E402
     [
         ("gemini-3.8-flash", "google/gemini-3.8-flash"),
         ("google/gemini-4-argon", "google/gemini-4-argon"),
+        ("google/gemini-3.1-pro-preview", "google/gemini-3.1-pro-preview"),
         ("deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash"),
     ],
 )
