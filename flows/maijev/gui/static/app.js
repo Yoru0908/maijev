@@ -63,7 +63,7 @@ $('#browser').onclick = (e) => {
   else { $('#input').value = el.dataset.file; $('#browser').classList.remove('open'); }
 };
 
-/* ---------- shared glossary: picked and saved before a job starts ---------- */
+/* ---------- shared glossary: written and saved before a job starts ---------- */
 let glossDirty = false;
 const recallGloss = () => { try { return localStorage.getItem('maijev.glossary') || ''; } catch { return ''; } };
 const rememberGloss = (name) => { try { localStorage.setItem('maijev.glossary', name); } catch {} };
@@ -79,31 +79,33 @@ async function showGlossary() {
   const sel = $('#glossSel');
   const name = sel.value;
   $('#glossText').value = name ? (await api(`/api/glossaries/${encodeURIComponent(name)}`)).text : '';
-  $('#glossText').disabled = $('#glossSave').disabled = $('#glossDel').disabled = !name;
-  sel.dataset.cur = name;
+  $('#glossName').value = name;
+  $('#glossDel').disabled = !name;
   glossDirty = false;
   rememberGloss(name);
-  $('#glossHint').textContent = name ? `glossaries/${name}.md · 所有任务共用`
-    : sel.options.length > 1 ? '选一份共享词库，或用「新建」另存一份。'
-    : '还没有共享词库：点「新建」，把常用人名、昵称写进去，以后每个任务都能直接选。';
+  $('#glossHint').textContent = sel.options.length > 1
+    ? '改完点「保存」；换个名字保存就是另存一份新词库。'
+    : '还没有共享词库：在上面写好条目，填个名字点「保存」，以后每个任务都能直接选。';
 }
-async function saveSharedGlossary(name) {
+async function saveSharedGlossary() {
+  const name = $('#glossName').value.trim();
+  if (!name) throw new Error('先在「词库名」里给词库起个名字');
   const r = await api(`/api/glossaries/${encodeURIComponent(name)}`,
     { method: 'PUT', body: JSON.stringify({ text: $('#glossText').value }) });
-  glossDirty = false;
-  return r;
+  await loadGlossaries(name);
+  return { name, ...r };
 }
 $('#glossText').oninput = () => { glossDirty = true; };
 $('#glossSel').onchange = async () => {
   try {
-    if (glossDirty) await saveSharedGlossary($('#glossSel').dataset.cur);
+    if (glossDirty && $('#glossName').value.trim()) await saveSharedGlossary();
     await showGlossary();
   } catch (e) { toast(e.message, 4000); }
 };
 $('#glossSave').onclick = async () => {
   try {
-    const r = await saveSharedGlossary($('#glossSel').value);
-    toast(`共享词库已保存（${r.lines} 条）`);
+    const r = await saveSharedGlossary();
+    toast(`词库「${r.name}」已保存（${r.lines} 条）`);
   } catch (e) { toast(e.message, 4000); }
 };
 $('#glossDel').onclick = async () => {
@@ -113,16 +115,6 @@ $('#glossDel').onclick = async () => {
     await api(`/api/glossaries/${encodeURIComponent(name)}`, { method: 'DELETE' });
     await loadGlossaries('');
     toast(`已删除词库「${name}」`);
-  } catch (e) { toast(e.message, 4000); }
-};
-$('#glossNew').onclick = async () => {
-  const name = (prompt('新词库名称（例如 46）') || '').trim();
-  if (!name) return;
-  if ([...$('#glossSel').options].some((o) => o.value === name) && !confirm(`「${name}」已存在，覆盖？`)) return;
-  try {
-    await saveSharedGlossary(name);
-    await loadGlossaries(name);
-    toast(`已新建词库「${name}」`);
   } catch (e) { toast(e.message, 4000); }
 };
 
@@ -136,7 +128,6 @@ $('#modes').onclick = (e) => {
 $('#startBtn').onclick = async () => {
   const input = $('#input').value.trim();
   if (!input) return toast('先填输入路径或来源');
-  const glossary = mode === 'zh' ? $('#glossSel').value || null : null;
   const body = {
     input, mode,
     name: $('#name').value.trim() || null,
@@ -146,11 +137,11 @@ $('#startBtn').onclick = async () => {
     segment_model: $('#segmentModel').value || null,
     translate_model: $('#translateModel').value || null,
     thinking_level: $('#thinking').value || null,
-    glossary,
   };
   try {
     $('#startBtn').disabled = true;
-    if (glossary && glossDirty) await saveSharedGlossary(glossary);
+    if (mode === 'zh' && glossDirty) await saveSharedGlossary();
+    body.glossary = mode === 'zh' ? $('#glossSel').value || null : null;
     const snap = await api('/api/jobs', { method: 'POST', body: JSON.stringify(body) });
     toast(`已启动 ${snap.id}`);
     await refreshJobs();

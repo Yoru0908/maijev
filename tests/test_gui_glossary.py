@@ -28,7 +28,8 @@ def test_shared_glossary_round_trip_and_name_check(gui):
     assert server.put_shared_glossary('46', server.GlossaryBody(text='  ねこがみ -> 猫神\n\n'))['lines'] == 1
     assert server.list_glossaries() == ['46']
     assert server.get_shared_glossary('46')['text'] == 'ねこがみ -> 猫神\n'
-    for bad in ['../x', '.hidden', 'a b']:
+    assert server.put_shared_glossary('46 符号', server.GlossaryBody(text='x'))['ok']
+    for bad in ['../x', 'a/b', '.hidden', ' 46', '']:
         with pytest.raises(HTTPException):
             server.put_shared_glossary(bad, server.GlossaryBody(text='x'))
 

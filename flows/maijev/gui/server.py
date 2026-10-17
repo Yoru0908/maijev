@@ -47,6 +47,7 @@ PROCS: dict[str, subprocess.Popen] = {}
 _COST: dict[str, tuple[float, float | None]] = {}
 
 SAFE_NAME = re.compile(r"[^\w.\-]+")
+BAD_GLOSSARY_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 MEDIA_EXT = {".mp4", ".mkv", ".mov", ".ts", ".m4a", ".mp3", ".wav", ".flac", ".aac", ".webm"}
 FILES = [
     "out_ja_zh.srt", "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md",
@@ -87,8 +88,9 @@ def _work_dir(job_id: str) -> Path:
 
 
 def _glossary_file(name: str) -> Path:
-    if SAFE_NAME.search(name) or name.startswith(".") or len(name) > 60:
-        raise HTTPException(400, "词库名只能用文字、数字、- _ .")
+    if (not name or name != name.strip() or name.startswith(".") or len(name) > 60
+            or BAD_GLOSSARY_NAME.search(name)):
+        raise HTTPException(400, '词库名不能为空，也不能含 < > : " / \\ | ? *')
     return GLOSSARIES / f"{name}.md"
 
 

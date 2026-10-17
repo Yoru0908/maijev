@@ -156,14 +156,14 @@
         <label>人工词库（开始前选好，第一遍翻译就会用上）</label>
         <div class="row">
           <select id="glossSel"><option value="">不使用</option></select>
-          <button id="glossNew" title="用当前内容另存为一份新词库">新建</button>
           <button id="glossDel" class="danger" disabled>删除</button>
         </div>
-        <textarea id="glossText" rows="6" disabled placeholder="原文 -> 写法&#10;ねこがみ -> 猫神&#10;〇〇さん -> 全名"></textarea>
-        <div class="glossary-actions">
-          <div class="hint" id="glossHint"></div>
-          <button id="glossSave" disabled>保存</button>
+        <textarea id="glossText" rows="6" placeholder="原文 -> 写法&#10;ねこがみ -> 猫神&#10;〇〇さん -> 全名"></textarea>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="glossName" placeholder="词库名，例如 46">
+          <button id="glossSave">保存</button>
         </div>
+        <div class="hint" id="glossHint"></div>
         <label class="check"><input type="checkbox" id="prepass" checked> 生成自动词库（pre-pass）</label>
         <div class="hint">不需要 OCR。用字幕全文归并人名/地名/节目名；人工词库与它冲突时以人工为准。</div>
         <label>OCR JSON（可选）</label>
