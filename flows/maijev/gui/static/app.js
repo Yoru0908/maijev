@@ -79,7 +79,7 @@ async function showGlossary() {
   const sel = $('#glossSel');
   const name = sel.value;
   $('#glossText').value = name ? (await api(`/api/glossaries/${encodeURIComponent(name)}`)).text : '';
-  $('#glossText').disabled = $('#glossSave').disabled = !name;
+  $('#glossText').disabled = $('#glossSave').disabled = $('#glossDel').disabled = !name;
   sel.dataset.cur = name;
   glossDirty = false;
   rememberGloss(name);
@@ -104,6 +104,15 @@ $('#glossSave').onclick = async () => {
   try {
     const r = await saveSharedGlossary($('#glossSel').value);
     toast(`共享词库已保存（${r.lines} 条）`);
+  } catch (e) { toast(e.message, 4000); }
+};
+$('#glossDel').onclick = async () => {
+  const name = $('#glossSel').value;
+  if (!name || !confirm(`删除共享词库「${name}」？用过它的任务重跑时会提示找不到。`)) return;
+  try {
+    await api(`/api/glossaries/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await loadGlossaries('');
+    toast(`已删除词库「${name}」`);
   } catch (e) { toast(e.message, 4000); }
 };
 $('#glossNew').onclick = async () => {

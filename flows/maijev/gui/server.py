@@ -448,6 +448,15 @@ def put_shared_glossary(name: str, body: GlossaryBody):
     return _write_glossary(p, body.text)
 
 
+@app.delete("/api/glossaries/{name}")
+def delete_shared_glossary(name: str):
+    p = _glossary_file(name)
+    if not p.is_file():
+        raise HTTPException(404, "glossary not found")
+    p.unlink()
+    return {"ok": True}
+
+
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

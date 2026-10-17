@@ -33,6 +33,15 @@ def test_shared_glossary_round_trip_and_name_check(gui):
             server.put_shared_glossary(bad, server.GlossaryBody(text='x'))
 
 
+def test_delete_shared_glossary(gui):
+    server.put_shared_glossary('46', server.GlossaryBody(text='ねこがみ -> 猫神'))
+    server.delete_shared_glossary('46')
+    assert server.list_glossaries() == []
+    for name in ['46', '../x']:
+        with pytest.raises(HTTPException):
+            server.delete_shared_glossary(name)
+
+
 def test_new_job_uses_shared_glossary_from_first_run(gui):
     server.put_shared_glossary('46', server.GlossaryBody(text='ねこがみ -> 猫神'))
     wd = server.RUNS / 'fresh'
