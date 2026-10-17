@@ -64,6 +64,60 @@ $('#browser').onclick = (e) => {
   else { $('#input').value = el.dataset.file; $('#browser').classList.remove('open'); }
 };
 
+/* ---------- shared glossary: picked and saved before a job starts ---------- */
+let glossDirty = false;
+const recallGloss = () => { try { return localStorage.getItem('maijev.glossary') || ''; } catch { return ''; } };
+const rememberGloss = (name) => { try { localStorage.setItem('maijev.glossary', name); } catch {} };
+
+async function loadGlossaries(pick) {
+  const names = await api('/api/glossaries');
+  const sel = $('#glossSel');
+  sel.innerHTML = '<option value="">不使用</option>' + names.map((n) => `<option>${esc(n)}</option>`).join('');
+  sel.value = names.includes(pick) ? pick : '';
+  await showGlossary();
+}
+async function showGlossary() {
+  const sel = $('#glossSel');
+  const name = sel.value;
+  $('#glossText').value = name ? (await api(`/api/glossaries/${encodeURIComponent(name)}`)).text : '';
+  $('#glossText').disabled = $('#glossSave').disabled = !name;
+  sel.dataset.cur = name;
+  glossDirty = false;
+  rememberGloss(name);
+  $('#glossHint').textContent = name ? `glossaries/${name}.md · 所有任务共用`
+    : sel.options.length > 1 ? '选一份共享词库，或用「新建」另存一份。'
+    : '还没有共享词库：点「新建」，把常用人名、昵称写进去，以后每个任务都能直接选。';
+}
+async function saveSharedGlossary(name) {
+  const r = await api(`/api/glossaries/${encodeURIComponent(name)}`,
+    { method: 'PUT', body: JSON.stringify({ text: $('#glossText').value }) });
+  glossDirty = false;
+  return r;
+}
+$('#glossText').oninput = () => { glossDirty = true; };
+$('#glossSel').onchange = async () => {
+  try {
+    if (glossDirty) await saveSharedGlossary($('#glossSel').dataset.cur);
+    await showGlossary();
+  } catch (e) { toast(e.message, 4000); }
+};
+$('#glossSave').onclick = async () => {
+  try {
+    const r = await saveSharedGlossary($('#glossSel').value);
+    toast(`共享词库已保存（${r.lines} 条）`);
+  } catch (e) { toast(e.message, 4000); }
+};
+$('#glossNew').onclick = async () => {
+  const name = (prompt('新词库名称（例如 46）') || '').trim();
+  if (!name) return;
+  if ([...$('#glossSel').options].some((o) => o.value === name) && !confirm(`「${name}」已存在，覆盖？`)) return;
+  try {
+    await saveSharedGlossary(name);
+    await loadGlossaries(name);
+    toast(`已新建词库「${name}」`);
+  } catch (e) { toast(e.message, 4000); }
+};
+
 /* ---------- new job form ---------- */
 $('#modes').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return;
@@ -74,6 +128,7 @@ $('#modes').onclick = (e) => {
 $('#startBtn').onclick = async () => {
   const input = $('#input').value.trim();
   if (!input) return toast('先填输入路径或来源');
+  const glossary = mode === 'zh' ? $('#glossSel').value || null : null;
   const body = {
     input, mode,
     name: $('#name').value.trim() || null,
@@ -84,9 +139,11 @@ $('#startBtn').onclick = async () => {
     segment_model: $('#segmentModel').value || null,
     translate_model: $('#translateModel').value || null,
     thinking_level: $('#thinking').value || null,
+    glossary,
   };
   try {
     $('#startBtn').disabled = true;
+    if (glossary && glossDirty) await saveSharedGlossary(glossary);
     const snap = await api('/api/jobs', { method: 'POST', body: JSON.stringify(body) });
     toast(`已启动 ${snap.id}`);
     await refreshJobs();
@@ -144,7 +201,7 @@ function renderState(s) {
     loadGlossary(s.id);
   }
   const job = s.job || {};
-  $('.src', d).textContent = [job.input, job.translation_profile === 'yamakawa-ui' && '山川宇衣口吻', job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
+  $('.src', d).textContent = [job.input, job.translation_profile === 'yamakawa-ui' && '山川宇衣口吻', job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.glossary && `词库=${job.glossary}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
   $('.cancelBtn', d).disabled = !s.running;
   $('.rerunBtn', d).disabled = s.running || !job.input;
   $('.saveRerun', d).disabled = s.running || !job.input;
@@ -162,8 +219,8 @@ function renderState(s) {
   $('.facts', d).innerHTML = facts.map((f) => `<div class="fact">${f}</div>`).join('');
 
   const main = s.bilingual ? 'out_ja_zh.srt' : s.zh ? 'out_zh.srt' : s.ja ? 'out_llm_ja.srt' : s.asr ? 'out.srt' : null;
-  const fileLabels = {'out_ja_zh.srt': '中日双语 SRT', 'out_zh.srt': '中文 SRT', 'out_llm_ja.srt': '日文 SRT', 'out.srt': 'ASR 原始 SRT'};
-  $('.files', d).innerHTML = s.files.filter((f) => f.endsWith('.srt') || f === 'timings.json' || f === 'source_meta.json')
+  const fileLabels = {'out_ja_zh.srt': '中日双语 SRT', 'out_zh.srt': '中文 SRT', 'out_llm_ja.srt': '日文 SRT', 'out.srt': 'ASR 原始 SRT', 'glossary_effective.md': '合并后人工词库'};
+  $('.files', d).innerHTML = s.files.filter((f) => f.endsWith('.srt') || f in fileLabels || f === 'timings.json' || f === 'source_meta.json')
     .map((f) => `<a class="${f === main ? 'main' : ''}" href="/api/jobs/${s.id}/files/${f}?download=1">↓ ${fileLabels[f] || f}</a>`).join('');
   if (main && $('.srt', d).dataset.file !== main + s.mtime) {
     $('.srt', d).dataset.file = main + s.mtime;
@@ -226,7 +283,7 @@ async function rerun(id) {
 }
 
 /* ---------- boot ---------- */
-loadEnv().then(refreshJobs).then(() => {
+loadEnv().then(() => loadGlossaries(recallGloss())).then(refreshJobs).then(() => {
   const first = $('#jobs li[data-id]');
   if (first) select(first.dataset.id);
 });

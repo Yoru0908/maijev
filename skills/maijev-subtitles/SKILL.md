@@ -94,7 +94,7 @@ TRANSLATE_GLOSSARY_PATH="/path/to/runs/example/glossary_user.md" \
 uv run python -m flows.maijev.gui --host 127.0.0.1 --port 8792 --runs "/path/to/runs"
 ```
 
-选择“日文 + 中文”会同时生成双语 SRT。任务完成后可预览、下载“中日双语 SRT”，并保留单语下载。修改“人工词库”后点“保存并重翻”。GUI 无鉴权，按用户需求在本机启动即可。
+选择“日文 + 中文”会同时生成双语 SRT。任务完成后可预览、下载“中日双语 SRT”，并保留单语下载。常用译名写进新建任务表单的共享“人工词库”（`glossaries/<名字>.md`），开始前保存，第一遍翻译即生效；单个任务的修正写右侧“本任务人工词库”后点“保存并重翻”，同一原文以本任务为准。GUI 无鉴权，按用户需求在本机启动即可。
 
 ## 交付检查
 

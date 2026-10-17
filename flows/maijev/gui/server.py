@@ -7,8 +7,10 @@ Design: every job is one ``python -m flows.maijev.pipeline`` subprocess and
 one work_dir. The work_dir *is* the state — progress, results and the
 glossary are all derived from the files the pipeline already writes, so
 the pipeline itself needs no changes. Logs go to ``work_dir/gui.log`` and
-are tailed over SSE. User glossary edits land in ``glossary_user.md`` and
-reach the pipeline through ``TRANSLATE_GLOSSARY_PATH`` on re-run; the
+are tailed over SSE. Manual glossaries come in three layers — ``.env``
+``TRANSLATE_GLOSSARY_PATH`` < a shared ``glossaries/<name>.md`` picked
+before the job starts < the job's own ``glossary_user.md`` — merged per
+原文 into one file and handed over as ``TRANSLATE_GLOSSARY_PATH``; the
 translate cache key includes the system prompt, so only translation redoes.
 """
 
@@ -41,6 +43,7 @@ from flows.maijev.translate_llm import _load_system, local_ui_available  # noqa:
 
 STATIC = Path(__file__).parent / "static"
 RUNS = ROOT / "runs"
+GLOSSARIES = ROOT / "glossaries"
 PROCS: dict[str, subprocess.Popen] = {}
 _COST: dict[str, tuple[float, float | None]] = {}
 
@@ -48,7 +51,8 @@ SAFE_NAME = re.compile(r"[^\w.\-]+")
 MEDIA_EXT = {".mp4", ".mkv", ".mov", ".ts", ".m4a", ".mp3", ".wav", ".flac", ".aac", ".webm"}
 FILES = [
     "out_ja_zh.srt", "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md",
-    "glossary_user.md", "timings.json", "source_meta.json", "job.json", "gui.log",
+    "glossary_user.md", "glossary_effective.md", "timings.json", "source_meta.json",
+    "job.json", "gui.log",
 ]
 
 app = FastAPI(title="maijev")
@@ -66,6 +70,7 @@ class JobRequest(BaseModel):
     translate_model: str | None = None
     thinking_level: str | None = None
     translation_profile: Literal["generic", "yamakawa-ui"] = "generic"
+    glossary: str | None = None
 
 
 class GlossaryBody(BaseModel):
@@ -81,6 +86,40 @@ def _work_dir(job_id: str) -> Path:
     if not wd.is_dir():
         raise HTTPException(404, "job not found")
     return wd
+
+
+def _glossary_file(name: str) -> Path:
+    if SAFE_NAME.search(name) or name.startswith(".") or len(name) > 60:
+        raise HTTPException(400, "词库名只能用文字、数字、- _ .")
+    return GLOSSARIES / f"{name}.md"
+
+
+def _write_glossary(p: Path, text: str) -> dict:
+    text = text.strip()
+    p.write_text(text + "\n" if text else "", encoding="utf-8")
+    return {"ok": True, "lines": len([l for l in text.splitlines() if l.strip()])}
+
+
+def _merge_glossaries(paths: list[Path]) -> str:
+    """Later files win: one row per 原文 (the part before ``->``)."""
+    rows: dict[str, str] = {}
+    for p in paths:
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                rows[line.split("->", 1)[0].strip()] = line.strip()
+    return "\n".join(rows.values())
+
+
+def _manual_glossary(wd: Path, shared: Path | None, base: str | None) -> Path | None:
+    """Layer .env < shared < this job; a single layer is passed through untouched."""
+    layers = [Path(base) if base else None, shared, wd / "glossary_user.md"]
+    layers = [p for p in layers if p and p.is_file() and p.read_text(encoding="utf-8").strip()]
+    merged = wd / "glossary_effective.md"
+    if len(layers) < 2:
+        merged.unlink(missing_ok=True)
+        return layers[0] if layers else None
+    merged.write_text(_merge_glossaries(layers) + "\n", encoding="utf-8")
+    return merged
 
 
 def _running(job_id: str) -> bool:
@@ -165,6 +204,9 @@ def _launch(wd: Path, req: JobRequest) -> None:
                     validate_model(os.environ.get("PREPASS_MODEL") or translation)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
+    shared = _glossary_file(req.glossary) if req.glossary else None
+    if shared and not shared.is_file():
+        raise HTTPException(400, f"共享词库不存在：{req.glossary}")
     cmd = [sys.executable, "-m", "flows.maijev.pipeline", req.input, str(wd)]
     if req.mode == "zh":
         if req.translation_profile != "generic":
@@ -192,11 +234,11 @@ def _launch(wd: Path, req: JobRequest) -> None:
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     if req.thinking_level:
         env["LLM_THINKING_LEVEL"] = req.thinking_level
-    user_glossary = wd / "glossary_user.md"
-    if user_glossary.exists() and user_glossary.read_text(encoding="utf-8").strip():
-        env["TRANSLATE_GLOSSARY_PATH"] = str(user_glossary)
 
     wd.mkdir(parents=True, exist_ok=True)
+    manual = _manual_glossary(wd, shared, env.get("TRANSLATE_GLOSSARY_PATH"))
+    if manual:
+        env["TRANSLATE_GLOSSARY_PATH"] = str(manual)
     (wd / "job.json").write_text(
         json.dumps({**req.model_dump(), "started": time.time()}, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -390,10 +432,29 @@ def get_glossary(job_id: str):
 
 @app.put("/api/jobs/{job_id}/glossary")
 def put_glossary(job_id: str, body: GlossaryBody):
-    wd = _work_dir(job_id)
-    text = body.text.strip()
-    (wd / "glossary_user.md").write_text(text + "\n" if text else "", encoding="utf-8")
-    return {"ok": True, "lines": len([l for l in text.splitlines() if l.strip()])}
+    return _write_glossary(_work_dir(job_id) / "glossary_user.md", body.text)
+
+
+@app.get("/api/glossaries")
+def list_glossaries():
+    if not GLOSSARIES.is_dir():
+        return []
+    return sorted(p.stem for p in GLOSSARIES.glob("*.md") if not p.name.startswith("."))
+
+
+@app.get("/api/glossaries/{name}")
+def get_shared_glossary(name: str):
+    p = _glossary_file(name)
+    if not p.is_file():
+        raise HTTPException(404, "glossary not found")
+    return {"name": name, "text": p.read_text(encoding="utf-8")}
+
+
+@app.put("/api/glossaries/{name}")
+def put_shared_glossary(name: str, body: GlossaryBody):
+    p = _glossary_file(name)
+    GLOSSARIES.mkdir(parents=True, exist_ok=True)
+    return _write_glossary(p, body.text)
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

@@ -193,10 +193,13 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 - 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
 - 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
 - 下载 `out_ja_zh.srt`（中日双语）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt`；优先预览双语文件，旧任务仍支持单语预览。
-- **人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
-  会以 `TRANSLATE_GLOSSARY_PATH` 重跑——在输入、模型和前序配置未变时复用 ASR / 合并 / pre-pass 缓存，
-  词库变化使翻译缓存失效。没有 OCR、没有 Jev 的用户就靠这一步修正译名：先开
-  pre-pass 拿一版自动词库，改掉不满意的条目，重翻即可。
+- **共享人工词库**：新建任务表单里选择或新建一份 `glossaries/<名字>.md`（已在
+  `.gitignore`），开始前保存好，第一遍翻译就会用上；点「开始」时未保存的修改会先自动保存。
+- **本任务人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
+  在输入、模型和前序配置未变时复用 ASR / 合并 / pre-pass 缓存，词库变化使翻译缓存失效。
+- **人工词库分层**：`.env` 的 `TRANSLATE_GLOSSARY_PATH` < 共享词库 < 本任务词库，按原文
+  去重、后者覆盖前者，合并结果写入 `glossary_effective.md` 并作为 `TRANSLATE_GLOSSARY_PATH`
+  交给翻译；只有一层时直接使用该文件。三层整体优先于自动词库。
 
 凭据状态在顶栏显示（只显示有无，不显示值）。绑定 `127.0.0.1` 时无鉴权；
 要对外暴露请自己套一层反向代理或 SSH 隧道，服务本身没有账号体系。

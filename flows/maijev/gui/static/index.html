@@ -19,7 +19,7 @@
   a:hover { text-decoration: underline; }
   button {
     font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg);
-    border-radius: 8px; padding: 7px 14px; cursor: pointer; transition: all .15s;
+    border-radius: 8px; padding: 7px 14px; cursor: pointer; transition: all .15s; white-space: nowrap;
   }
   button:hover { border-color: #bfdbfe; background: #eff6ff; }
   button.primary { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
@@ -161,8 +161,18 @@
           </select>
           <div class="hint">两种口吻都保留完整词库和最新单曲资料。</div>
         </div>
+        <label>人工词库（开始前选好，第一遍翻译就会用上）</label>
+        <div class="row">
+          <select id="glossSel"><option value="">不使用</option></select>
+          <button id="glossNew" title="用当前内容另存为一份新词库">新建</button>
+        </div>
+        <textarea id="glossText" rows="6" disabled placeholder="原文 -> 写法&#10;ねこがみ -> 猫神&#10;〇〇さん -> 全名"></textarea>
+        <div class="glossary-actions">
+          <div class="hint" id="glossHint"></div>
+          <button id="glossSave" disabled>保存</button>
+        </div>
         <label class="check"><input type="checkbox" id="prepass" checked> 生成自动词库（pre-pass）</label>
-        <div class="hint">不需要 OCR。用字幕全文归并人名/地名/节目名，翻译后可在右侧手动修正再重翻。</div>
+        <div class="hint">不需要 OCR。用字幕全文归并人名/地名/节目名；人工词库与它冲突时以人工为准。</div>
         <label>OCR JSON（可选）</label>
         <input type="text" id="ocr" placeholder="外部 OCR 产出的 ocr.json 路径">
         <div class="hint" id="ocrHint"></div>
@@ -222,8 +232,8 @@
       <textarea class="glossAuto" rows="10" readonly placeholder="没有自动词库（未开 pre-pass / OCR）——直接在右侧手写即可"></textarea>
     </div>
     <div>
-      <h2>人工词库 <span class="hint" style="display:inline">glossary_user.md · 优先级高于自动词库</span></h2>
-      <textarea class="glossUser" rows="10" placeholder="原文 -> 写法&#10;山川さん -> 山川宇衣&#10;ねこがみ -> 猫神"></textarea>
+      <h2>本任务人工词库 <span class="hint" style="display:inline">glossary_user.md · 优先于共享词库和自动词库</span></h2>
+      <textarea class="glossUser" rows="10" placeholder="只对这个任务生效的修正，同一原文覆盖共享词库&#10;原文 -> 写法&#10;ねこがみ -> 猫神"></textarea>
       <div class="glossary-actions">
         <div class="hint">保存后重跑：ASR / 合并 / pre-pass 全部命中缓存，只重新翻译。</div>
         <button class="saveGloss">保存</button>
