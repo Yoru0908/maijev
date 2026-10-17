@@ -25,16 +25,16 @@ def launched_glossary(popen):
 
 def test_shared_glossary_round_trip_and_name_check(gui):
     assert server.list_glossaries() == []
-    assert server.put_shared_glossary('46', server.GlossaryBody(text='  ういたん -> 宇衣碳\n\n'))['lines'] == 1
+    assert server.put_shared_glossary('46', server.GlossaryBody(text='  ねこがみ -> 猫神\n\n'))['lines'] == 1
     assert server.list_glossaries() == ['46']
-    assert server.get_shared_glossary('46')['text'] == 'ういたん -> 宇衣碳\n'
+    assert server.get_shared_glossary('46')['text'] == 'ねこがみ -> 猫神\n'
     for bad in ['../x', '.hidden', 'a b']:
         with pytest.raises(HTTPException):
             server.put_shared_glossary(bad, server.GlossaryBody(text='x'))
 
 
 def test_new_job_uses_shared_glossary_from_first_run(gui):
-    server.put_shared_glossary('46', server.GlossaryBody(text='ういたん -> 宇衣碳'))
+    server.put_shared_glossary('46', server.GlossaryBody(text='ねこがみ -> 猫神'))
     wd = server.RUNS / 'fresh'
     server._launch(wd, server.JobRequest(input='input.mp4', glossary='46'))
     assert launched_glossary(gui) == str(server.GLOSSARIES / '46.md')
@@ -65,13 +65,13 @@ def test_env_glossary_survives_job_edits(gui, monkeypatch, tmp_path):
     server._launch(wd, server.JobRequest(input='input.mp4'))
     assert launched_glossary(gui) == str(env_file)
     server.PROCS.clear()
-    server.put_glossary('job', server.GlossaryBody(text='山川さん -> 山川宇衣'))
+    server.put_glossary('job', server.GlossaryBody(text='〇〇さん -> 全名'))
     server.rerun_job('job')
-    assert (wd / 'glossary_effective.md').read_text() == '46 -> 46\n山川さん -> 山川宇衣\n'
+    assert (wd / 'glossary_effective.md').read_text() == '46 -> 46\n〇〇さん -> 全名\n'
 
 
 def test_rerun_keeps_shared_glossary_and_old_jobs_still_load(gui):
-    server.put_shared_glossary('46', server.GlossaryBody(text='ういたん -> 宇衣碳'))
+    server.put_shared_glossary('46', server.GlossaryBody(text='ねこがみ -> 猫神'))
     wd = server.RUNS / 'job'
     server._launch(wd, server.JobRequest(input='input.mp4', glossary='46'))
     server.PROCS.clear()
@@ -88,3 +88,12 @@ def test_missing_shared_glossary_fails_before_creating_job(gui):
         server._launch(server.RUNS / 'job', server.JobRequest(input='input.mp4', glossary='gone'))
     assert not (server.RUNS / 'job').exists()
     gui.assert_not_called()
+
+
+def test_rerun_ignores_retired_translation_profile(gui):
+    wd = server.RUNS / 'old'
+    wd.mkdir()
+    (wd / 'job.json').write_text(json.dumps(
+        {'input': 'input.mp4', 'mode': 'zh', 'translation_profile': 'yamakawa-ui'}))
+    server.rerun_job('old')
+    assert '--translation-profile' not in gui.call_args.args[0]

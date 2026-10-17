@@ -39,7 +39,6 @@ load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT))
 
 from flows.maijev.llm import DEFAULT_MODEL, SUPPORTED_MODELS, validate_model  # noqa: E402
-from flows.maijev.translate_llm import _load_system, local_ui_available  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
 RUNS = ROOT / "runs"
@@ -69,7 +68,6 @@ class JobRequest(BaseModel):
     segment_model: str | None = None
     translate_model: str | None = None
     thinking_level: str | None = None
-    translation_profile: Literal["generic", "yamakawa-ui"] = "generic"
     glossary: str | None = None
 
 
@@ -209,13 +207,7 @@ def _launch(wd: Path, req: JobRequest) -> None:
         raise HTTPException(400, f"共享词库不存在：{req.glossary}")
     cmd = [sys.executable, "-m", "flows.maijev.pipeline", req.input, str(wd)]
     if req.mode == "zh":
-        if req.translation_profile != "generic":
-            try:
-                _load_system(profile=req.translation_profile)
-            except (ValueError, OSError, KeyError) as exc:
-                raise HTTPException(400, str(exc)) from exc
         cmd.append("--translate")
-        cmd += ["--translation-profile", req.translation_profile]
         if req.prepass:
             cmd.append("--prepass")
     elif req.mode == "ja":
@@ -285,7 +277,6 @@ def env_status():
         or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "supported_models": list(SUPPORTED_MODELS),
         "runs": str(RUNS),
-        "local_ui_available": local_ui_available(),
     }
 
 

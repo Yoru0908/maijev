@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -31,36 +30,14 @@ MAX_WORKERS = 2
 PROMPT_PATH = Path(__file__).parent / "translate_prompt.md"
 
 
-def local_ui_available() -> bool:
-    """Expose the private profile only on a machine with its local files."""
-    return all(
-        os.environ.get(key) and Path(os.environ[key]).is_file()
-        for key in ("LOCAL_TRANSLATE_UI_PROMPT_PATH",
-                    "LOCAL_TRANSLATE_UI_GLOSSARY_PATH",
-                    "LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH",
-                    "TRANSLATE_BASE_GLOSSARY_PATH")
-    )
-
-
-def _profile_prompt_path(profile: str) -> Path:
-    if profile == "generic":
-        return PROMPT_PATH
-    if profile != "yamakawa-ui":
-        raise ValueError(f"unknown translation profile: {profile}")
-    if not local_ui_available():
-        raise ValueError("山川宇衣口吻需要原优化 Prompt、本地口吻补充、人工词表和完整基础词库")
-    return Path(os.environ["LOCAL_TRANSLATE_UI_PROMPT_PATH"])
-
-
 # --- deterministic post-processing (subtitle-group rules) -------------------
 # The model is asked to follow these, but we enforce them mechanically so a
 # sloppy batch can't leak violations into the final SRT.
 
-# Preserve the legacy generic-profile ban; Ui retains functional responses.
 _BANNED_CHARS = "啊嗯欸"
 
 
-def _clean_zh(text: str, *, profile: str = "generic") -> str:
+def _clean_zh(text: str) -> str:
     """Enforce subtitle-group output rules on every dialogue part."""
     # JA lines can never start with " -" (the first part is always plain),
     # so a leading dash in zh output is model noise — drop it.
@@ -69,7 +46,7 @@ def _clean_zh(text: str, *, profile: str = "generic") -> str:
     for part in text.split(" -"):
         part = part.replace("，", " ").replace("、", " ")
         part = part.replace("“", "「").replace("”", "」")
-        for ch in (_BANNED_CHARS if profile == "generic" else ""):
+        for ch in _BANNED_CHARS:
             part = part.replace(ch, "")
         part = part.strip().lstrip("。，、 ").rstrip("。，、 ")
         if part:
@@ -86,22 +63,11 @@ OUTPUT_CONTRACT = """
 """
 
 
-def _load_system(glossary_path: Path | None = None, *, profile: str = "generic") -> str:
+def _load_system(glossary_path: Path | None = None) -> str:
     parts = []
-    prompt_path = _profile_prompt_path(profile)
-    if profile == "yamakawa-ui":
-        original = Path(os.environ["LOCAL_TRANSLATE_OPTIMIZED_PROMPT_PATH"]).read_text(encoding="utf-8")
-        # The legacy appendix is loaded in full through the base glossary below.
-        appendix = re.search(r"^静态词库[^\S\n]*$", original, re.M)
-        original_rules = original[:appendix.start()] if appendix else original
-        parts.append("【原优化翻译 Prompt：保留全文规则】\n" + original_rules.strip())
-        if PROMPT_PATH.exists():
-            parts.append("【原 maijev 字幕规则】\n" + PROMPT_PATH.read_text(encoding="utf-8").strip())
-    if prompt_path.exists():
-        style = prompt_path.read_text(encoding="utf-8").strip()
+    if PROMPT_PATH.exists():
+        style = PROMPT_PATH.read_text(encoding="utf-8").strip()
         if style:
-            if profile == "yamakawa-ui":
-                parts.append("【本地山川宇衣专用口吻】")
             parts.append(style)
 
     glossary_parts = []
@@ -116,12 +82,6 @@ def _load_system(glossary_path: Path | None = None, *, profile: str = "generic")
             glossary_parts.append(
                 "【自动术语表（OCR + pre-pass 生成）】\n" + auto
             )
-    if profile == "yamakawa-ui":
-        entries = json.loads(Path(os.environ["LOCAL_TRANSLATE_UI_GLOSSARY_PATH"])
-                             .read_text(encoding="utf-8"))["entries"]
-        terms = "\n".join(f"{item['ja']} -> {item['zh']}（{item.get('note', '')}）"
-                          for item in entries)
-        glossary_parts.append("【宇衣本地人工词表；与基础/自动词表冲突时以此为准】\n" + terms)
     external_path = os.environ.get("TRANSLATE_GLOSSARY_PATH")
     if external_path:
         external = Path(external_path).read_text(encoding="utf-8").strip()
@@ -141,8 +101,8 @@ def _load_system(glossary_path: Path | None = None, *, profile: str = "generic")
     return "\n".join(parts)
 
 
-def _fallback_if_empty(line: MergedLine, text: str, *, profile: str = "generic") -> str:
-    cleaned = _clean_zh(text, profile=profile)
+def _fallback_if_empty(line: MergedLine, text: str) -> str:
+    cleaned = _clean_zh(text)
     return cleaned if cleaned.strip() else line.text
 
 
@@ -151,8 +111,6 @@ def _translate_batch(
     ids: list[int],
     system: str,
     model: str,
-    *,
-    profile: str = "generic",
 ) -> dict[int, str]:
     body = "\n".join(f"{i}\t{lines[i].text}" for i in ids)
     result = generate_json(body, system=system, model=model)
@@ -161,7 +119,7 @@ def _translate_batch(
         if isinstance(item, dict) and "id" in item and "zh" in item:
             item_id = int(item["id"])
             if item_id in ids:
-                out[item_id] = _fallback_if_empty(lines[item_id], str(item["zh"]), profile=profile)
+                out[item_id] = _fallback_if_empty(lines[item_id], str(item["zh"]))
     missing = [i for i in ids if i not in out]
     if missing:
         raise RuntimeError(f"translation missing ids: {missing[:10]}")
@@ -172,10 +130,8 @@ def translate_lines(
     lines: list[MergedLine],
     cache_dir: Path | None = None,
     glossary_path: Path | None = None,
-    *,
-    profile: str = "generic",
 ) -> list[str]:
-    system = _load_system(glossary_path, profile=profile)
+    system = _load_system(glossary_path)
     model = resolve_model("TRANSLATE_MODEL")
     translations: dict[int, str] = {}
     if cache_dir:
@@ -201,11 +157,11 @@ def translate_lines(
         if cache and cache.exists():
             cached = json.loads(cache.read_text(encoding="utf-8"))
             return {
-                int(k): _fallback_if_empty(lines[int(k)], str(v), profile=profile)
+                int(k): _fallback_if_empty(lines[int(k)], str(v))
                 for k, v in cached.items()
             }
         try:
-            batch = _translate_batch(lines, ids, system, model, profile=profile)
+            batch = _translate_batch(lines, ids, system, model)
         except Exception as e:
             if len(ids) > 1:
                 # Bisect and retry — a single bad line can corrupt the
@@ -239,7 +195,7 @@ def translate_lines(
         translations.update(batch)
 
     return [
-        _fallback_if_empty(lines[i], translations[i], profile=profile)
+        _fallback_if_empty(lines[i], translations[i])
         for i in range(len(lines))
     ]
 
