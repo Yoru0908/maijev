@@ -43,7 +43,7 @@ GEMINI_AGENT_PLATFORM_API_KEY=填写你的_Vertex_密钥
 
 **费用：基本不要钱。** Google Cloud 新账号有 **300 美元、90 天** 的免费试用额度，Gemini 的费用从这里扣；开通要绑卡，但试用期内不会自动扣费，额度用完或到期不升级就停用。MAI 听写在 OpenRouter 上约 **0.10 美元 / 小时音频**，充几美元能用很久。价格和试用条款以 [OpenRouter 模型页](https://openrouter.ai/microsoft/mai-transcribe-2)和 [Google 官方说明](https://docs.cloud.google.com/free)为准。
 
-OCR 筛选用的 Jev（TypeSafe 或 Cloudflare）是可选项，不填也能跑完整流程。
+OCR 筛选用的 Jev 是可选项，不填也能跑完整流程。需要时在 [TypeSafe 控制台](https://console.typesafe.ai) 注册（**注册送 5 美元额度**），在 API Keys 里创建 key，填到 `TYPESAFE_API_KEY`；也可以用 Cloudflare Workers AI（`CLOUDFLARE_ACCOUNT_ID` + [API Token](https://dash.cloudflare.com/profile/api-tokens) 填到 `CLOUDFLARE_API_TOKEN`）。
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
 
