@@ -35,6 +35,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
 | `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
+| `LLM_TIMEOUT` | 单次 LLM 请求超时秒数，默认 `1800` |
 | `SEGMENT_BATCH_SIZE` | merge 每次调用的 atom 数，默认 `1000` |
 | `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
@@ -67,7 +68,7 @@ export GEMINI_AGENT_PLATFORM_BASE_URL=https://aiplatform.googleapis.com/v1beta1/
 3. OpenRouter：`OPENROUTER_API_KEY`（自动换成 `anthropic/claude-sonnet-5.5` 这类 ID）
 
 ASR 本来就要 `OPENROUTER_API_KEY`，所以不配其他 key 时 Claude / GPT 直接走 OpenRouter。
-`LLM_THINKING_LEVEL` 只对 Gemini 生效。一个模型找不到任何后端时，在下载 / 听写前报错。
+`LLM_THINKING_LEVEL` 只对 Gemini 生效。较慢的模型一批可能要十几分钟，单次请求默认最多等 30 分钟（`LLM_TIMEOUT`）；仍然超时就调小 `SEGMENT_BATCH_SIZE` / `TRANSLATE_BATCH_SIZE`。一个模型找不到任何后端时，在下载 / 听写前报错。
 
 想用 ChatGPT / Claude 订阅登录的反代（如 CLIProxyAPI）的，自己架好后填成中转站即可；
 这类用法可能违反服务商条款，项目不内置。

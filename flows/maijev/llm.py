@@ -108,8 +108,11 @@ def generate(
     system: str | None = None,
     model: str | None = None,
     json_mode: bool = True,
-    timeout: int = 600,
+    timeout: int | None = None,
 ) -> LLMResult:
+    # A 1000-line batch is ~30k output tokens: minutes on Gemini Flash, far
+    # longer on slower models, so the default leaves plenty of headroom.
+    timeout = timeout or int(os.environ.get("LLM_TIMEOUT", "1800"))
     model = validate_model(model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL)
     route = _route(model)
     if not route:

@@ -154,3 +154,13 @@ def test_vertex_404_reports_the_original_error_without_retry(monkeypatch, sent):
     with pytest.raises(RuntimeError, match="LLM HTTP 404.*model gone"):
         llm.generate("p", model="gemini-3.8-flash")
     assert len(sent) == 1
+
+
+def test_request_timeout_defaults_long_and_follows_env(monkeypatch, sent):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or")
+    seen = []
+    monkeypatch.setattr(llm, "_generate_openai", lambda *a, **k: seen.append(k["timeout"]) or llm.LLMResult("{}"))
+    llm.generate("p", model="gpt-6.1-sol")
+    monkeypatch.setenv("LLM_TIMEOUT", "300")
+    llm.generate("p", model="gpt-6.1-sol")
+    assert seen == [1800, 300]
