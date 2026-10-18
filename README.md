@@ -28,13 +28,22 @@ uv sync --extra gui
 
 ### 2. 配置 API
 
-在仓库根目录创建 `.env`。下面以 OpenRouter 接入 MAI、Google AI Studio 接入 Gemini 为例：
+基础流程只需要两个 key：
+
+| 用途 | 去哪里申请 | 填到 `.env` |
+|---|---|---|
+| 听写（MAI-Transcribe 2） | [OpenRouter → Keys](https://openrouter.ai/settings/keys)，先在 [Credits](https://openrouter.ai/settings/credits) 充一点余额 | `OPENROUTER_API_KEY` |
+| 断句和翻译（Gemini，推荐） | [Google Cloud 免费试用](https://cloud.google.com/free) 开通后，在 [Vertex AI 快速模式](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys) 拿 API key，之后在 [凭据页](https://console.cloud.google.com/apis/credentials) 管理 | `GEMINI_AGENT_PLATFORM_API_KEY` |
+| 断句和翻译（另一种方式） | [Google AI Studio → API key](https://aistudio.google.com/apikey) | `GEMINI_API_KEY` |
 
 ```dotenv
 OPENROUTER_API_KEY=填写你的_OpenRouter_密钥
-GEMINI_API_KEY=填写你的_Gemini_密钥
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_AGENT_PLATFORM_API_KEY=填写你的_Vertex_密钥
 ```
+
+**费用：基本不要钱。** Google Cloud 新账号有 **300 美元、90 天** 的免费试用额度，Gemini 的费用从这里扣；开通要绑卡，但试用期内不会自动扣费，额度用完或到期不升级就停用。MAI 听写在 OpenRouter 上约 **0.10 美元 / 小时音频**，充几美元能用很久。价格和试用条款以 [OpenRouter 模型页](https://openrouter.ai/microsoft/mai-transcribe-2)和 [Google 官方说明](https://docs.cloud.google.com/free)为准。
+
+OCR 筛选用的 Jev（TypeSafe 或 Cloudflare）是可选项，不填也能跑完整流程。
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
 
