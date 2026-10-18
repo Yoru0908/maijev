@@ -47,7 +47,7 @@ OCR 筛选用的 Jev 是可选项，不填也能跑完整流程。需要时在 [
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
 
-断句、自动词库和翻译只允许 `gemini-3.8-flash`、`gemini-4-argon` 或 `gemini-3.1-pro-preview`，默认前者（Argon 需要 global 端点，见 [配置](docs/configuration.md)）。GUI 使用固定模型选项；CLI、环境变量及 API 的其他模型值会在开始下载或听写前报错。
+断句、自动词库和翻译推荐并默认使用 `gemini-3.8-flash`，也可选 `gemini-4-argon`、`gemini-3.1-pro-preview`（Argon 需要 global 端点，见 [配置](docs/configuration.md)）。Claude（Sonnet 5.5 / Opus 5.5 / Fable 5.1）和 GPT-6.1 Sol 也能用，可走原生 API、OpenAI 兼容中转站或 OpenRouter，但**没有测试过，效果自负**，见 [Claude / GPT](docs/configuration.md#claude--gpt未测试效果自负)。GUI 使用固定模型选项；CLI、环境变量及 API 的其他模型值会在开始下载或听写前报错。
 
 ### 3. 启动 GUI
 

@@ -13,6 +13,7 @@ def gui(monkeypatch, tmp_path):
     monkeypatch.setattr(server, 'GLOSSARIES', tmp_path / 'glossaries')
     monkeypatch.setattr(server, 'PROCS', {})
     monkeypatch.delenv('TRANSLATE_GLOSSARY_PATH', raising=False)
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test')  # any LLM backend passes check_model
     popen = Mock(return_value=Mock(poll=Mock(return_value=None)))
     monkeypatch.setattr(server.subprocess, 'Popen', popen)
     server.RUNS.mkdir()

@@ -27,7 +27,7 @@ async function loadEnv() {
     `<span class="chip ${ok ? 'ok' : 'no'}" title="${title || ''}">${label} ${ok ? '✓' : '✗'}</span>`;
   $('#envChips').innerHTML =
     chip(env.asr, 'ASR', 'OPENROUTER_API_KEY') +
-    chip(env.llm, 'Gemini', 'GEMINI_AGENT_PLATFORM_API_KEY / GEMINI_API_KEY') +
+    chip(env.llm, 'LLM', 'GEMINI_AGENT_PLATFORM_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY / LLM_RELAY_API_KEY') +
     chip(!!env.jev, env.jev ? `Jev·${env.jev}` : 'Jev', 'TYPESAFE_API_KEY 或 Cloudflare');
   $('#runsDir').textContent = `runs: ${env.runs}`;
   $('#segmentModel').options[0].textContent = `默认 ${env.segment_default}`;

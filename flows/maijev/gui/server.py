@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT))
 
-from flows.maijev.llm import DEFAULT_MODEL, SUPPORTED_MODELS, validate_model  # noqa: E402
+from flows.maijev.llm import DEFAULT_MODEL, SUPPORTED_MODELS, check_model, validate_model  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
 RUNS = ROOT / "runs"
@@ -195,13 +195,13 @@ def _launch(wd: Path, req: JobRequest) -> None:
                 if getattr(req, field):
                     setattr(req, field, validate_model(getattr(req, field)))
             fallback = req.model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
-            validate_model(req.segment_model or os.environ.get("SEGMENT_MODEL") or fallback)
+            check_model(req.segment_model or os.environ.get("SEGMENT_MODEL") or fallback)
             if req.mode == "zh":
                 translation = (req.translate_model
                                or os.environ.get("TRANSLATE_MODEL") or fallback)
-                validate_model(translation)
+                check_model(translation)
                 if req.prepass or req.ocr_json:
-                    validate_model(os.environ.get("PREPASS_MODEL") or translation)
+                    check_model(os.environ.get("PREPASS_MODEL") or translation)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     shared = _glossary_file(req.glossary) if req.glossary else None
@@ -270,7 +270,8 @@ def env_status():
     return {
         "asr": has("OPENROUTER_API_KEY"),
         "llm": has("GEMINI_AGENT_PLATFORM_API_KEY", "AGENT_PLATFORM_API_KEY",
-                   "GEMINI_API_KEY", "OPENROUTER_API_KEY"),
+                   "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+                   "LLM_RELAY_API_KEY", "OPENROUTER_API_KEY"),
         "jev": jev,
         "default_model": os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "segment_default": os.environ.get("SEGMENT_MODEL")

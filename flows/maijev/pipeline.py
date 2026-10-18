@@ -42,7 +42,7 @@ from .chunker import (  # noqa: E402
 )
 from .merge import merge_chunks  # noqa: E402
 from .transcriber import transcribe_chunk  # noqa: E402
-from .llm import SUPPORTED_MODELS, resolve_model, validate_model  # noqa: E402
+from .llm import SUPPORTED_MODELS, check_model, resolve_model, validate_model  # noqa: E402
 from .jev import JevClient, load_ocr_items, render_context  # noqa: E402
 from .frames import prepare_reference_frames  # noqa: E402
 
@@ -59,11 +59,11 @@ def run(
     prepass: bool = False,
 ) -> Path:
     if llm_segment or translate:
-        resolve_model("SEGMENT_MODEL")
+        check_model(resolve_model("SEGMENT_MODEL"))
         if translate:
-            resolve_model("TRANSLATE_MODEL")
+            check_model(resolve_model("TRANSLATE_MODEL"))
             if prepass or ocr_json:
-                validate_model(os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL"))
+                check_model(os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL"))
     work_dir.mkdir(parents=True, exist_ok=True)
     run_t0 = time.perf_counter()
     timings: dict[str, float] = {}
@@ -301,7 +301,7 @@ def main() -> None:
         default=None,
         type=validate_model,
         choices=SUPPORTED_MODELS,
-        help="Gemini model for all LLM stages (same as GEMINI_MODEL; "
+        help="model for all LLM stages (same as GEMINI_MODEL; "
         "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
     )
     for stage in ("segment", "translate"):

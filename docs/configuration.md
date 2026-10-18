@@ -24,9 +24,12 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `GEMINI_AGENT_PLATFORM_API_KEY` | Vertex AI Agent Platform |
 | `AGENT_PLATFORM_API_KEY` | Vertex key 兼容别名 |
 | `GEMINI_API_KEY` | Google AI Studio |
-| `OPENROUTER_API_KEY` | 没有 Gemini key 时的 LLM fallback；同时用于 ASR |
+| `ANTHROPIC_API_KEY` | Claude 原生 API（`ANTHROPIC_BASE_URL` 可改为 Anthropic 格式的中转） |
+| `OPENAI_API_KEY` | GPT 原生 API（`OPENAI_BASE_URL` 可改地址，默认 `https://api.openai.com/v1`） |
+| `LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY` | OpenAI 兼容中转站，任何模型都可走，例如 `https://relay.example/v1` |
+| `OPENROUTER_API_KEY` | 最后的 LLM fallback；同时用于 ASR |
 | `GEMINI_AGENT_PLATFORM_BASE_URL` | 可选的 Vertex publisher endpoint |
-| `GEMINI_MODEL` | 全局 Gemini 模型默认值（同 `--model`，默认 `gemini-3.8-flash`） |
+| `GEMINI_MODEL` | 全局模型默认值（同 `--model`，默认 `gemini-3.8-flash`） |
 | `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
@@ -50,6 +53,24 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 ```bash
 export GEMINI_AGENT_PLATFORM_BASE_URL=https://aiplatform.googleapis.com/v1beta1/projects/<项目ID或编号>/locations/global/publishers/google/models
 ```
+
+### Claude / GPT（未测试，效果自负）
+
+除 Gemini 外还允许 `claude-sonnet-5-5`、`claude-opus-5-5`、`claude-fable-5-1`、`gpt-6.1-sol`。
+**推荐仍是 Gemini**：prompt、批次大小和超时都按 Gemini 3.8 Flash 调过，其他模型只确认过
+能返回可解析的 JSON，整片质量、速度和费用没有验证。
+
+每个模型按下面顺序选第一个配置好的后端：
+
+1. 原生 API：Gemini 用 Vertex / AI Studio key，Claude 用 `ANTHROPIC_API_KEY`，GPT 用 `OPENAI_API_KEY`
+2. 中转站：`LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY`（OpenAI chat/completions 格式，模型名用上面的原生 ID）
+3. OpenRouter：`OPENROUTER_API_KEY`（自动换成 `anthropic/claude-sonnet-5.5` 这类 ID）
+
+ASR 本来就要 `OPENROUTER_API_KEY`，所以不配其他 key 时 Claude / GPT 直接走 OpenRouter。
+`LLM_THINKING_LEVEL` 只对 Gemini 生效。一个模型找不到任何后端时，在下载 / 听写前报错。
+
+想用 ChatGPT / Claude 订阅登录的反代（如 CLIProxyAPI）的，自己架好后填成中转站即可；
+这类用法可能违反服务商条款，项目不内置。
 
 ### 模型选择建议
 
