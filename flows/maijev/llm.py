@@ -54,10 +54,6 @@ def validate_model(model: str) -> str:
 DEFAULT_BASE_URL = (
     "https://aiplatform.googleapis.com/v1beta1/publishers/google/models"
 )
-FALLBACK_BASE_URL = (
-    "https://us-central1-aiplatform.googleapis.com/v1beta1"
-    "/publishers/google/models"
-)
 
 
 @dataclass
@@ -169,12 +165,7 @@ def generate(
     try:
         payload = _post(url, body, timeout)
     except urllib.error.HTTPError as e:
-        # Vertex publisher endpoint 404 → retry on the global host.
-        if e.code == 404 and api_key and "us-central1" not in url:
-            url = f"{FALLBACK_BASE_URL}/{model}:generateContent?key={api_key}"
-            payload = _post(url, body, timeout)
-        else:
-            raise RuntimeError(f"LLM HTTP {e.code}: {e.read()[:300]!r}") from e
+        raise RuntimeError(f"LLM HTTP {e.code}: {e.read()[:300]!r}") from e
 
     if "error" in payload:
         raise RuntimeError(f"LLM error: {payload['error']}")

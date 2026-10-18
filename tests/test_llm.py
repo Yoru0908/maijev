@@ -141,3 +141,16 @@ def test_gui_rejects_invalid_model_before_creating_job(monkeypatch, tmp_path):
         server._launch(work, req)
     assert exc.value.status_code == 400
     assert not work.exists()
+
+
+def test_vertex_404_reports_the_original_error_without_retry(monkeypatch, sent):
+    monkeypatch.setenv("AGENT_PLATFORM_API_KEY", "g")
+
+    def not_found(req, timeout=0):
+        sent.append(req.full_url)
+        raise llm.urllib.error.HTTPError(req.full_url, 404, "nf", {}, io.BytesIO(b"model gone"))
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", not_found)
+    with pytest.raises(RuntimeError, match="LLM HTTP 404.*model gone"):
+        llm.generate("p", model="gemini-3.8-flash")
+    assert len(sent) == 1
