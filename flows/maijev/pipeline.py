@@ -182,8 +182,8 @@ def run(
     # 6. optional LLM stages: merge segmentation + zh translation
     if llm_segment or translate:
         from .prepass import run_prepass
-        from .segment_llm import MergedLine, build_atoms, merge_utterances
-        from .translate_llm import render_srt, translate_lines
+        from .segment_llm import MergedLine, build_atoms, merge_utterances, trim_heads
+        from .translate_llm import render_srt, translate_lines_with_heads
 
         # Deterministic word-level atoms; the LLM only merges them.
         split_t0 = time.perf_counter()
@@ -234,7 +234,7 @@ def run(
                 timings["prepass_seconds"] = time.perf_counter() - prepass_t0
 
             translate_t0 = time.perf_counter()
-            zh = translate_lines(
+            zh, heads = translate_lines_with_heads(
                 lines,
                 work_dir / "zh_cache",
                 glossary_path=(
@@ -242,12 +242,17 @@ def run(
                 ),
             )
             timings["translate_seconds"] = time.perf_counter() - translate_t0
+            # Chinese cues start after the interjections the model omitted.
+            zh_lines = trim_heads(lines, heads, payload["words"])
+            trimmed = sum(a.start != b.start for a, b in zip(lines, zh_lines))
+            logger.info(f"{trimmed} cues start later after omitted heads; "
+                        f"{zh.count(None)} filler-only lines dropped from zh")
             zh_srt = work_dir / "out_zh.srt"
-            zh_srt.write_text(render_srt(lines, zh), encoding="utf-8")
+            zh_srt.write_text(render_srt(zh_lines, zh), encoding="utf-8")
             logger.success(f"ZH SRT: {zh_srt}")
             bilingual_srt = work_dir / "out_ja_zh.srt"
             bilingual_srt.write_text(
-                render_srt(lines, zh, bilingual=True), encoding="utf-8"
+                render_srt(zh_lines, zh, bilingual=True), encoding="utf-8"
             )
             logger.success(f"JA/ZH bilingual SRT: {bilingual_srt}")
             result_path = zh_srt

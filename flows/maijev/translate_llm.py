@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -26,6 +27,15 @@ from .segment_llm import MergedLine
 # lines), not its context window; tune via env when switching models.
 BATCH_SIZE = int(os.environ.get("TRANSLATE_BATCH_SIZE", "1000"))
 MAX_WORKERS = 2
+# The model decides what to omit; the program only trusts the part of its
+# skip_head that is interjections up to a punctuation mark, so meaningful
+# words (でも、本当に) and lookalikes (はいつも、こういう) never move a cue.
+_HEAD_PUNCT = "、。，,！!？?…〜～ 　-"
+_FILLER_RUN = re.compile(
+    r"(?:(?:えーっと|えーと|えっと|うーんと|うーん|なんだろう|なんか|あのー|あのう|あの"
+    r"|そのー|その|まあ|こう|はい|ええ|うん|んー|ん|あー|えー|あ|え|お)[ねさ]?)+"
+)
+_HEAD_SEGMENT = re.compile(rf"[^{_HEAD_PUNCT}]+(?:[{_HEAD_PUNCT}]+|$)")
 
 PROMPT_PATH = Path(__file__).parent / "translate_prompt.md"
 
@@ -55,11 +65,15 @@ def _clean_zh(text: str) -> str:
 OUTPUT_CONTRACT = """
 【输出契约】
 输入是带编号的日文字幕行列表（id<TAB>日文）。你必须输出 JSON：
-{"lines": [{"id": <int>, "zh": "<简体中文译文>"}, ...]}
+{"lines": [{"id": <int>, "zh": "<简体中文译文>", "skip_head": "<可选>"}, ...]}
 
 - 每个输入 id 必须恰好出现一次，禁止遗漏、禁止新增 id。
 - zh 字段只放译文文本，不要注释、不要编号、不要时间轴。
 - 日文中已有的 " -" 说话人分隔符必须保留在译文对应位置。
+- 译文省略了该行日文开头的语气词或口癖时，写 skip_head：被省略的日文开头，
+  与原文开头逐字一致（含标点），例如原文「なんか、あのー、私いつもさ」写
+  "なんか、あのー、"。开头没有省略时不写该字段。
+- 整行都是可省略的语气词时，zh 输出空字符串，skip_head 写整行原文。
 """
 
 
@@ -101,9 +115,38 @@ def _load_system(glossary_path: Path | None = None) -> str:
     return "\n".join(parts)
 
 
-def _fallback_if_empty(line: MergedLine, text: str) -> str:
-    cleaned = _clean_zh(text)
-    return cleaned if cleaned.strip() else line.text
+def _filler_head(skip: str, *, whole: bool = False) -> str:
+    """Longest prefix of ``skip`` made of interjection runs ending in punctuation.
+
+    Only a whole-line skip may end without punctuation (a bare 「はい」).
+    """
+    head = ""
+    for m in _HEAD_SEGMENT.finditer(skip):
+        seg = m.group()
+        if m.start() != len(head) or not _FILLER_RUN.fullmatch(seg.rstrip(_HEAD_PUNCT)):
+            break
+        if seg[-1] not in _HEAD_PUNCT and not whole:
+            break
+        head = skip[:m.end()]
+    return head
+
+
+def _resolve(line: MergedLine, row) -> tuple[str | None, str]:
+    """Turn a model row into (zh, verified skip_head).
+
+    ``None`` means the model omitted a filler-only line on purpose;
+    any other empty output still falls back to the Japanese source.
+    """
+    if isinstance(row, str):
+        row = {"zh": row}
+    skip = str(row.get("skip_head") or "")
+    head = _filler_head(skip, whole=skip == line.text) if line.text.startswith(skip) else ""
+    zh = _clean_zh(str(row.get("zh", "")))
+    if zh.strip():
+        return zh, head
+    if head and head == line.text:
+        return None, head
+    return line.text, ""
 
 
 def _translate_batch(
@@ -111,15 +154,18 @@ def _translate_batch(
     ids: list[int],
     system: str,
     model: str,
-) -> dict[int, str]:
+) -> dict[int, dict]:
     body = "\n".join(f"{i}\t{lines[i].text}" for i in ids)
     result = generate_json(body, system=system, model=model)
-    out: dict[int, str] = {}
+    out: dict[int, dict] = {}
     for item in result.get("lines", []):
         if isinstance(item, dict) and "id" in item and "zh" in item:
             item_id = int(item["id"])
             if item_id in ids:
-                out[item_id] = _fallback_if_empty(lines[item_id], str(item["zh"]))
+                row = {"zh": str(item["zh"])}
+                if item.get("skip_head"):
+                    row["skip_head"] = str(item["skip_head"])
+                out[item_id] = row
     missing = [i for i in ids if i not in out]
     if missing:
         raise RuntimeError(f"translation missing ids: {missing[:10]}")
@@ -130,14 +176,23 @@ def translate_lines(
     lines: list[MergedLine],
     cache_dir: Path | None = None,
     glossary_path: Path | None = None,
-) -> list[str]:
+) -> list[str | None]:
+    return translate_lines_with_heads(lines, cache_dir, glossary_path)[0]
+
+
+def translate_lines_with_heads(
+    lines: list[MergedLine],
+    cache_dir: Path | None = None,
+    glossary_path: Path | None = None,
+) -> tuple[list[str | None], list[str]]:
+    """Translate and return each line's verified omitted head (or "")."""
     system = _load_system(glossary_path)
     model = resolve_model("TRANSLATE_MODEL")
-    translations: dict[int, str] = {}
+    translations: dict[int, dict | str] = {}
     if cache_dir:
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def one_batch(i: int, end: int | None = None) -> dict[int, str]:
+    def one_batch(i: int, end: int | None = None) -> dict[int, dict | str]:
         ids = list(range(i, end or min(i + BATCH_SIZE, len(lines))))
         # Key by content hash, not index: line boundaries shift whenever
         # atomize/merge changes, and an index-keyed cache would silently
@@ -156,10 +211,7 @@ def translate_lines(
         cache = cache_dir / f"batch_{body_key}.json" if cache_dir else None
         if cache and cache.exists():
             cached = json.loads(cache.read_text(encoding="utf-8"))
-            return {
-                int(k): _fallback_if_empty(lines[int(k)], str(v))
-                for k, v in cached.items()
-            }
+            return {int(k): v for k, v in cached.items()}
         try:
             batch = _translate_batch(lines, ids, system, model)
         except Exception as e:
@@ -194,17 +246,19 @@ def translate_lines(
     for batch in results:
         translations.update(batch)
 
-    return [
-        _fallback_if_empty(lines[i], translations[i])
-        for i in range(len(lines))
-    ]
+    resolved = [_resolve(lines[i], translations[i]) for i in range(len(lines))]
+    return [zh for zh, _ in resolved], [head for _, head in resolved]
 
 
 
 def render_srt(
-    lines: list[MergedLine], texts: list[str], *, bilingual: bool = False,
+    lines: list[MergedLine], texts: list[str | None], *, bilingual: bool = False,
 ) -> str:
-    """Render aligned cues; bilingual puts source Japanese above translation."""
+    """Render aligned cues; bilingual puts source Japanese above translation.
+
+    A ``None`` text is a filler line the model omitted: no Chinese cue, and
+    the bilingual file keeps only the Japanese.
+    """
     if len(lines) != len(texts):
         raise ValueError("subtitle lines and translations must have equal lengths")
     def ts(t: float) -> str:
@@ -226,19 +280,25 @@ def render_srt(
     blocks = []
     n = 0
     for line, text in zip(lines, texts):
-        text = clean_dialogue(text)
-        if not has_content(text):
-            # Last-resort preservation for filler-only or malformed model rows.
-            # Never silently drop a real timeline line.
-            text = clean_dialogue(line.text)
-            if not has_content(text):
+        source = clean_dialogue(line.text)
+        if text is None:
+            if not (bilingual and has_content(source)):
                 continue
+            target = ""
+        else:
+            target = clean_dialogue(text)
+            if not has_content(target):
+                # Last-resort preservation for malformed model rows.
+                # Never silently drop a real timeline line.
+                target = source
+                if not has_content(target):
+                    continue
         n += 1
         if bilingual:
             # Keep each language on one physical line; a blank line would
             # terminate an SRT cue. Do not ask the model to rebuild timing.
-            source = " ".join(clean_dialogue(line.text).splitlines()).strip()
-            target = " ".join(text.splitlines()).strip()
-            text = f"{source}\n{target}"
-        blocks.append(f"{n}\n{ts(line.start)} --> {ts(line.end)}\n{text}\n")
+            source = " ".join(source.splitlines()).strip()
+            target = " ".join(target.splitlines()).strip()
+            target = f"{source}\n{target}" if target else source
+        blocks.append(f"{n}\n{ts(line.start)} --> {ts(line.end)}\n{target}\n")
     return "\n".join(blocks)

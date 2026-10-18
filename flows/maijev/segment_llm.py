@@ -24,8 +24,9 @@ import hashlib
 import json
 import os
 import re
+from bisect import bisect_left
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -164,6 +165,39 @@ class MergedLine:
     end: float
     text: str
     utterance_ids: list[int]
+
+
+# A trimmed cue appears slightly before speech and never becomes a flash.
+HEAD_LEAD_S = 0.1
+MIN_CUE_S = 0.5
+
+
+def trim_heads(lines: list[MergedLine], heads: list[str], words: list[dict]) -> list[MergedLine]:
+    """Start each cue at the first word after the head the translation omitted.
+
+    MAI words concatenate to the line text, so the omitted head maps to exact
+    word timestamps. Any mismatch keeps the original timing.
+    """
+    words = sorted(words, key=lambda w: w["start"])
+    starts = [w["start"] for w in words]
+    return [
+        _trim_head(line, head, words[bisect_left(starts, line.start - 1e-3):])
+        for line, head in zip(lines, heads)
+    ]
+
+
+def _trim_head(line: MergedLine, head: str, words: list[dict]) -> MergedLine:
+    if not head or head == line.text or not line.text.startswith(head):
+        return line
+    seen = ""
+    for i, w in enumerate(words[:-1]):
+        seen += w["text"]
+        if seen == head:
+            start = max(line.start, words[i + 1]["start"] - HEAD_LEAD_S)
+            return replace(line, start=start) if line.end - start >= MIN_CUE_S else line
+        if not head.startswith(seen):
+            return line
+    return line
 
 
 def build_atoms(payload: dict) -> list[dict]:

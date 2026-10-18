@@ -175,19 +175,28 @@ id<TAB>日文字幕文本
 ```json
 {
   "lines": [
-    {"id": 0, "zh": "中文译文"},
+    {"id": 0, "zh": "我平时不是都把提问回答", "skip_head": "なんか、あのー、"},
     {"id": 1, "zh": "下一行译文"}
   ]
 }
 ```
 
+`skip_head` 可选：模型省略了日文开头的语气词时写出被省略的原文；整行都是语气词时
+`zh` 为空。是否省略由模型按 prompt 判断。
+
 程序按 `id` 对回 `MergedLine`：
 
 ```text
-MergedLine.start + MergedLine.end + translated zh
+MergedLine + translated zh + 核对后的 skip_head
+  → trim_heads()：用 MAI 逐字时间把中文 cue 的开始挪到省略部分之后（提前 0.1s，剩余不足 0.5s 不挪）
   → render_srt()
-  → out_zh.srt
+  → out_zh.srt / out_ja_zh.srt（out_llm_ja.srt 保持原时间）
 ```
+
+程序只信任 `skip_head` 开头由语气词组成、并在标点处结束的部分（`_filler_head`），
+所以「でも」「本当に」等有意义的词、以及「はいつも」「こういう」这类形近写法不会被挪掉。
+整行省略只在整行都是语气词时生效：中文 SRT 不出该 cue，双语 SRT 只保留日文；
+其他空译文仍回退为日文原文。
 
 翻译 LLM 不负责输出时间轴；时间轴来自 ASR word 时间戳和程序的 atom/group 边界。
 
