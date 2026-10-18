@@ -193,7 +193,7 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 - 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
 - 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
 - 下载 `out_ja_zh.srt`（中日双语）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt`；优先预览双语文件，旧任务仍支持单语预览。
-- **共享人工词库**：新建任务表单里选择、新建或删除 `glossaries/<名字>.md`（已在
+- **共享人工词库**：新建任务表单里选择词库，或填「词库名」后保存、删除 `glossaries/<名字>.md`（已在
   `.gitignore`），开始前保存好，第一遍翻译就会用上；点「开始」时未保存的修改会先自动保存。
 - **本任务人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
   在输入、模型和前序配置未变时复用 ASR / 合并 / pre-pass 缓存，词库变化使翻译缓存失效。
@@ -242,3 +242,19 @@ cat runs/example/timings.json
 ```
 
 翻译阶段会对空译文回退到原文。renderer 仍会跳过只含标点、没有可显示文字的块。
+整行只有语气词、被模型整行省略的 cue 不会出现在 `out_zh.srt`（双语文件里只显示日文），
+所以中文条数比日文少是正常的。
+
+### 双击启动后提示「自动更新跳过」
+
+`start.bat` / `start.command` 只做 `git pull --ff-only`，本地改过仓库里的文件（例如
+`flows/maijev/translate_prompt.md`）就不会更新。先备份自己的改动，再恢复到远端版本：
+
+```bash
+git diff > my_changes.diff
+git fetch origin
+git reset --hard origin/master
+```
+
+`.env`、`runs/`、`glossaries/` 不在仓库里，不受影响。个人词库放 `glossaries/` 或用
+`TRANSLATE_GLOSSARY_PATH` 指向，不要直接改仓库文件。
