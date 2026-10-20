@@ -74,7 +74,10 @@ def detect_silences(wav_path: Path) -> list[float]:
             "-af", f"silencedetect=noise={SILENCE_NOISE_DB}:d={SILENCE_MIN_DURATION_S}",
             "-f", "null", "-",
         ],
-        capture_output=True, text=True,
+        # ffmpeg's stderr carries the input's metadata as UTF-8 (e.g. a
+        # Japanese title); the locale default (cp950 on zh-TW Windows) can't
+        # decode it and leaves stderr as None.
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     mids = []
     for m in re.finditer(
