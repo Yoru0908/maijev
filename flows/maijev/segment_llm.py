@@ -51,8 +51,9 @@ SOFT_PUNCT = set("、，,：:；;")
 SILENCE_SPLIT_S = 1.0
 MAX_ATOM_CHARS = 48
 
-# Merging across a pause this long is almost always wrong; reject such
-# groups even if the model returns them.
+# Merging across a pause this long is almost always wrong; merged lines are
+# split there even if the model returned them. Users override it per run
+# (SEGMENT_MAX_GAP_S / --max-gap); うん coalescing always uses this default.
 MAX_MERGE_GAP_S = 2.0
 UN_PAIR_GAP_S = 1.0
 _UN_RE = re.compile(r"^\s*(?:うん)+[、。！？?!…\s]*$")
@@ -272,9 +273,10 @@ def parse_segments(
     The model must return ``{"segments": [[...], ...]}`` whose groups, read
     in order, are exactly ``start_idx .. end_idx-1``. Anything else raises
     ValueError so the caller can retry instead of silently losing atoms.
-    A segment that crosses a pause of ``MAX_MERGE_GAP_S`` or more is split
-    at that pause rather than dropped. Single-atom segments are omitted:
-    the cached result is only the multi-atom groups.
+    Single-atom segments are omitted: the cached result is only the
+    multi-atom groups, as the model returned them — the pause cap is
+    applied later by ``split_at_pauses`` so changing it never re-calls
+    the model.
     """
     segments = result.get("segments") if isinstance(result, dict) else None
     if not isinstance(segments, list) or not all(
@@ -288,17 +290,44 @@ def parse_segments(
             f"segments do not cover atoms {start_idx}-{end_idx - 1} "
             "exactly once in order"
         )
+    return [s for s in segments if len(s) >= 2]
 
-    groups: list[list[int]] = []
-    for seg in segments:
-        run = [seg[0]]
-        for a, b in zip(seg, seg[1:]):
-            if atoms[b]["start"] - atoms[a]["end"] >= MAX_MERGE_GAP_S:
-                groups.append(run)
+
+def parse_gap(raw: str) -> float:
+    """Parse a pause cap in seconds; anything but a positive number raises."""
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 0.0
+    if not value > 0:
+        raise ValueError(f"pause cap must be a positive number of seconds, got {raw!r}")
+    return value
+
+
+def max_merge_gap() -> float:
+    """The pause cap for this run: SEGMENT_MAX_GAP_S, else MAX_MERGE_GAP_S."""
+    raw = os.environ.get("SEGMENT_MAX_GAP_S", "").strip()
+    return parse_gap(raw) if raw else MAX_MERGE_GAP_S
+
+
+def split_at_pauses(
+    groups: list[list[int]], atoms: list[dict], max_gap: float
+) -> list[list[int]]:
+    """Split each group at every pause of ``max_gap`` seconds or more.
+
+    A segment crossing a long pause is split there, not dropped; pieces
+    left with a single atom become ordinary single lines.
+    """
+    out: list[list[int]] = []
+    for group in groups:
+        run = [group[0]]
+        for a, b in zip(group, group[1:]):
+            if atoms[b]["start"] - atoms[a]["end"] >= max_gap:
+                out.append(run)
                 run = []
             run.append(b)
-        groups.append(run)
-    return [g for g in groups if len(g) >= 2]
+        out.append(run)
+    return [g for g in out if len(g) >= 2]
 
 
 def _llm_merge_batch(
@@ -396,7 +425,11 @@ def merge_utterances(
         results = [
             _merge_one(atoms, r[0], r[1], cache_dir) for r in ranges
         ]
-    groups: list[list[int]] = [g for batch in results for g in batch]
+    max_gap = max_merge_gap()
+    groups = split_at_pauses(
+        [g for batch in results for g in batch], atoms, max_gap
+    )
+    logger.info(f"Pause cap: lines split at pauses >= {max_gap:.2f}s")
 
     # Apply groups; ungrouped atoms become single lines.
     grouped = {i for g in groups for i in g}

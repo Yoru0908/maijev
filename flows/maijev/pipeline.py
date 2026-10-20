@@ -45,6 +45,7 @@ from .transcriber import transcribe_chunk  # noqa: E402
 from .llm import SUPPORTED_MODELS, check_model, resolve_model, validate_model  # noqa: E402
 from .jev import JevClient, load_ocr_items, render_context  # noqa: E402
 from .frames import prepare_reference_frames  # noqa: E402
+from .segment_llm import parse_gap  # noqa: E402
 
 
 def run(
@@ -313,7 +314,17 @@ def main() -> None:
             help=f"model for the {stage} stage only; overrides "
             f"{stage.upper()}_MODEL from .env",
         )
+    parser.add_argument(
+        "--max-gap",
+        default=None,
+        type=parse_gap,
+        metavar="SECONDS",
+        help="split merged lines at pauses this long or longer; overrides "
+        "SEGMENT_MAX_GAP_S from .env (default 2.0)",
+    )
     args = parser.parse_args()
+    if args.max_gap is not None:
+        os.environ["SEGMENT_MAX_GAP_S"] = str(args.max_gap)
     if args.model:
         os.environ["GEMINI_MODEL"] = args.model
     if args.segment_model:

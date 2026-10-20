@@ -39,7 +39,9 @@ from flows.maijev.segment_llm import (  # noqa: E402
     PROMPT_PATH,
     _format_atom,
     build_atoms,
+    max_merge_gap,
     parse_segments,
+    split_at_pauses,
 )
 
 
@@ -54,7 +56,8 @@ def llm_merge(atoms: list[dict], system: str) -> list[list[int]]:
         prompt, system=system, model=os.environ.get("SEGMENT_MODEL") or None
     )
     print("RAW RESPONSE:\n", json.dumps(result, ensure_ascii=False, indent=1))
-    return parse_segments(result, atoms, 0, len(atoms))
+    groups = parse_segments(result, atoms, 0, len(atoms))
+    return split_at_pauses(groups, atoms, max_merge_gap())
 
 
 def render(atoms: list[dict], groups: list[list[int]]) -> str:

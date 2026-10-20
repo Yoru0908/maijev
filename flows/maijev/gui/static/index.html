@@ -28,7 +28,7 @@
   button.accent:hover { background: #ea580c; }
   button.danger { color: var(--err); }
   button:disabled { opacity: .45; cursor: not-allowed; }
-  input[type=text], select, textarea {
+  input[type=text], input[type=number], select, textarea {
     font: inherit; width: 100%; border: 1px solid var(--line); border-radius: 8px;
     padding: 7px 10px; background: var(--card); color: var(--fg);
   }
@@ -185,6 +185,7 @@
             <option value="gpt-6.1-sol">GPT-6.1 Sol</option>
           </optgroup>
         </select>
+        <input type="number" id="maxGap" min="0.1" step="0.1" placeholder="停顿 2.0" style="flex:none;width:110px" title="停顿超过这个秒数就强制分行">
       </div>
       <label>翻译模型</label>
       <div class="row">
@@ -204,7 +205,7 @@
           <option value="">思考默认</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option>
         </select>
       </div>
-      <div class="hint">合并和翻译可以选不同模型；自动词库跟随翻译模型。在这里选择会覆盖 .env 里的设置。</div>
+      <div class="hint">合并模型右边的秒数：停顿达到它就强制分行，留空为默认 2.0，越小字幕越碎；用同一任务名重跑时不重做 ASR 和合并，只重跑词库和翻译。合并和翻译可以选不同模型；自动词库跟随翻译模型。在这里选择会覆盖 .env 里的设置。</div>
       <div style="margin-top:16px"><button class="primary" id="startBtn" style="width:100%">开始</button></div>
     </section>
 

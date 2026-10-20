@@ -137,6 +137,7 @@ $('#startBtn').onclick = async () => {
     segment_model: $('#segmentModel').value || null,
     translate_model: $('#translateModel').value || null,
     thinking_level: $('#thinking').value || null,
+    max_gap: $('#maxGap').value ? Number($('#maxGap').value) : null,
   };
   try {
     $('#startBtn').disabled = true;
@@ -199,7 +200,7 @@ function renderState(s) {
     loadGlossary(s.id);
   }
   const job = s.job || {};
-  $('.src', d).textContent = [job.input, job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.glossary && `词库=${job.glossary}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
+  $('.src', d).textContent = [job.input, job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.max_gap && `停顿≥${job.max_gap}s 分行`, job.glossary && `词库=${job.glossary}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
   $('.cancelBtn', d).disabled = !s.running;
   $('.rerunBtn', d).disabled = s.running || !job.input;
   $('.saveRerun', d).disabled = s.running || !job.input;

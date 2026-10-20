@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
@@ -69,6 +69,7 @@ class JobRequest(BaseModel):
     segment_model: str | None = None
     translate_model: str | None = None
     thinking_level: str | None = None
+    max_gap: float | None = Field(None, gt=0)
     glossary: str | None = None
 
 
@@ -224,6 +225,8 @@ def _launch(wd: Path, req: JobRequest) -> None:
         cmd += ["--segment-model", req.segment_model]
     if req.translate_model and req.mode == "zh":
         cmd += ["--translate-model", req.translate_model]
+    if req.max_gap is not None and req.mode != "asr":
+        cmd += ["--max-gap", str(req.max_gap)]
 
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     if req.thinking_level:

@@ -155,9 +155,9 @@ LLM 返回**完整分区**：每个 atom 恰好出现一次，独立成条的 at
 
 1. 校验所有组按顺序展开后正好是该 batch 的 `start..end-1`；遗漏、重复、乱序或
    空组都视为无效，重试一次，仍无效则 batch 失败。
-2. 在跨越过长静音（≥ `MAX_MERGE_GAP_S`）处拆开 segment，而不是整组丢弃。
-3. 根据组内首尾 atom 恢复 `start` 和 `end`。
-4. 单 atom 的组不进入缓存，缓存里只有多 atom 的合并组。
+2. 单 atom 的组不进入缓存，缓存里只有模型返回的多 atom 合并组。
+3. 读取缓存后，在跨越过长静音（≥ 停顿上限，默认 `MAX_MERGE_GAP_S` = 2.0，`SEGMENT_MAX_GAP_S` / `--max-gap` 可调）处拆开 segment，而不是整组丢弃；改上限不需要重新调用模型。
+4. 根据组内首尾 atom 恢复 `start` 和 `end`。
 
 LLM 不接收也不生成最终 SRT 时间戳。如果 merge batch 连续失败，程序直接报错，
 不会把失败 batch 静默伪装成成功结果。

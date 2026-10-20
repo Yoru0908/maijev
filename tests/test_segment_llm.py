@@ -112,6 +112,53 @@ def test_merge_splits_segment_at_long_pause(monkeypatch):
     assert [l.text for l in lines] == ["ab", "cd"]
 
 
+def _short_pause_atoms():
+    return [
+        _atom("327号", 0.0, 1.0, "c00_s1"),
+        _atom("我是", 1.6, 2.0, "c00_s2", gap=0.6),
+        _atom("XXX", 2.0, 2.5, "c00_s2"),
+    ]
+
+
+def test_merge_pause_cap_defaults_to_two_seconds(monkeypatch):
+    monkeypatch.delenv("SEGMENT_MAX_GAP_S", raising=False)
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0, 1, 2]]))
+    lines = seg.merge_utterances(_short_pause_atoms(), cache_dir=None)
+    assert [l.text for l in lines] == ["327号 -我是XXX"]
+
+
+def test_merge_pause_cap_is_user_configurable(monkeypatch):
+    monkeypatch.setenv("SEGMENT_MAX_GAP_S", "0.5")
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0, 1, 2]]))
+    lines = seg.merge_utterances(_short_pause_atoms(), cache_dir=None)
+    assert [l.text for l in lines] == ["327号", "我是XXX"]
+    assert (lines[1].start, lines[1].end) == (1.6, 2.5)
+
+
+def test_changing_pause_cap_reuses_merge_cache(monkeypatch, tmp_path):
+    """The cache holds the model's groups; a new cap re-splits them
+    without calling the model again."""
+    monkeypatch.delenv("SEGMENT_MAX_GAP_S", raising=False)
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0, 1, 2]]))
+    seg.merge_utterances(_short_pause_atoms(), cache_dir=tmp_path)
+
+    def no_llm(*a, **k):
+        raise AssertionError("merge model must not be called")
+
+    monkeypatch.setattr(seg, "generate_json", no_llm)
+    monkeypatch.setenv("SEGMENT_MAX_GAP_S", "0.5")
+    lines = seg.merge_utterances(_short_pause_atoms(), cache_dir=tmp_path)
+    assert [l.text for l in lines] == ["327号", "我是XXX"]
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "abc", "nan"])
+def test_merge_rejects_invalid_pause_cap(monkeypatch, raw):
+    monkeypatch.setenv("SEGMENT_MAX_GAP_S", raw)
+    monkeypatch.setattr(seg, "generate_json", _fake_llm([[0, 1, 2]]))
+    with pytest.raises(ValueError, match="pause cap"):
+        seg.merge_utterances(_short_pause_atoms(), cache_dir=None)
+
+
 def test_merge_accepts_singleton_segments(monkeypatch):
     atoms = [
         _atom("a", 0.0, 0.5, "c00_s1"),

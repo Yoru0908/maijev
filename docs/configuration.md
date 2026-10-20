@@ -37,6 +37,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `LLM_TIMEOUT` | 单次 LLM 请求超时秒数，默认 `1800` |
 | `SEGMENT_BATCH_SIZE` | merge 每次调用的 atom 数，默认 `1000` |
+| `SEGMENT_MAX_GAP_S` | 合并后的字幕行在停顿达到这个秒数处强制拆开，默认 `2.0`；同 CLI `--max-gap`、GUI 合并模型右边的秒数 |
 | `TRANSLATE_BATCH_SIZE` | translation 每次调用的字幕行数，默认 `1000` |
 | `TRANSLATE_GLOSSARY_PATH` | 可选外部术语表路径 |
 
@@ -46,6 +47,8 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 `.env` 的阶段设置。pre-pass 未单独设置 `PREPASS_MODEL` 时跟随翻译模型。项目主推并默认使用
 `gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash`、`gemini-4-argon` 或 `gemini-3.1-pro-preview`；其他值在下载/听写前报错。可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
+
+断句停顿上限因人和节目而异：独白一句话中间停 1–2 秒很常见，对话节目可能希望更早分行。值越小字幕越碎（作者 13 段带合并缓存的电话素材：2.0 → 634 行，1.0 → 972 行，0.5 → 1345 行）。拆分在读取合并缓存之后执行，用同一任务目录重跑时不会重新调用合并模型，但 pre-pass 和翻译会因字幕行变化而重跑。单独的「うん」并入相邻句的规则始终使用 2.0。
 
 `gemini-4-argon` 只在 Vertex 的 global location 提供，默认端点会返回 404。
 使用 Argon 时把 `GEMINI_AGENT_PLATFORM_BASE_URL` 设为带项目的 global 地址
