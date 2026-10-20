@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _has_locale(name: str) -> bool:
+    if shutil.which("locale") is None:  # Windows
+        return False
     out = subprocess.run(["locale", "-a"], capture_output=True, text=True).stdout
     return name in out.split()
 
