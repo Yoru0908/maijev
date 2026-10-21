@@ -96,8 +96,9 @@ def transcribe_chunk(
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:300]
             last_error = TranscribeError(f"HTTP {e.code}: {detail}")
-            # 429/5xx are transient; 4xx auth/quota errors are not.
-            if e.code not in (429, 500, 502, 503, 504):
+            # 429/5xx are transient (incl. Cloudflare 52x relayed by the
+            # provider); 4xx auth/quota errors are not.
+            if e.code != 429 and e.code < 500:
                 raise last_error
             wait = 5 * (attempt + 1)
             logger.warning(f"{wav_path.name}: HTTP {e.code}, retry in {wait}s")
