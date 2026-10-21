@@ -16,13 +16,16 @@ uv run python -m flows.maijev.pipeline \
 runs/example/out.srt
 ```
 
-## 远程来源（yt-dlp）
+## 远程来源
 
-`input` 也可以是平台视频 ID 或完整 URL，经 yt-dlp 下载后继续同一流水线：
+`input` 也可以是平台视频 ID 或完整 URL，下载后继续同一流水线。Bilibili 走网页播放器
+接口（不需要登录；B 站反爬会拦 yt-dlp 的网页解析，接口失败时才退回 yt-dlp），
+不登录时画质一般最高 480p/720p，转写只用音频不受影响；多 P 视频用 `?p=N` 指定分 P。
+其他平台走 yt-dlp：
 
 | 平台 | 示例 |
 |---|---|
-| Bilibili | `BV1ZArvBaEqL` / `https://www.bilibili.com/video/BV1ZArvBaEqL` |
+| Bilibili | `BV1ZArvBaEqL` / `https://www.bilibili.com/video/BV1ZArvBaEqL?p=2` |
 | TVer | `ep12345` / `https://tver.jp/episodes/ep12345` |
 | Abema | `90-979_s1_p123` / `https://abema.tv/video/episode/90-979_s1_p123` |
 | YouTube | `v=dQw4w9WgXcQ` / `https://youtu.be/dQw4w9WgXcQ` |

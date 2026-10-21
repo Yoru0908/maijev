@@ -1,15 +1,19 @@
-"""Video source resolution: yt-dlp download + platform talent metadata.
+"""Video source resolution: download + platform talent metadata.
 
 Accepts a local file path or a source string (platform video ID or full URL)
-for Bilibili / TVer / Abema / YouTube. TVer and Abema additionally expose cast
-(talents) metadata, which the pipeline injects into the pre-pass as
-authoritative person anchors — they bypass JEV classification entirely.
+for Bilibili / TVer / Abema / YouTube. Bilibili goes through its web player
+API (yt-dlp as fallback); the others through yt-dlp. TVer and Abema
+additionally expose cast (talents) metadata, which the pipeline injects into
+the pre-pass as authoritative person anchors — they bypass JEV classification
+entirely.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,11 +31,13 @@ class VideoSource:
 
     video_id: str
     platform: str  # bilibili | youtube | tver | abema
+    page: int = 1  # Bilibili multi-part index (?p=N)
 
     @property
     def url(self) -> str:
         if self.platform == "bilibili":
-            return f"https://www.bilibili.com/video/{self.video_id}"
+            suffix = f"?p={self.page}" if self.page > 1 else ""
+            return f"https://www.bilibili.com/video/{self.video_id}{suffix}"
         if self.platform == "tver":
             return f"https://tver.jp/episodes/{self.video_id}"
         if self.platform == "abema":
@@ -94,16 +100,93 @@ def classify_platform(video_id: str) -> str:
     return "abema"
 
 
+def _bili_page(source_str: str) -> int:
+    p = parse_qs(urlparse(source_str).query).get("p", [""])[0]
+    return int(p) if p.isdigit() and int(p) > 0 else 1
+
+
 def resolve_source(source_str: str) -> VideoSource:
     video_id = parse_source_id(source_str)
-    return VideoSource(video_id, classify_platform(video_id))
+    platform = classify_platform(video_id)
+    page = _bili_page(source_str) if platform == "bilibili" else 1
+    return VideoSource(video_id, platform, page)
 
 
 def download_video(source: VideoSource, dest_dir: Path) -> Path:
-    """Download the source video with yt-dlp; returns the video file path."""
+    """Download the source video; returns the video file path."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if source.platform == "bilibili":
+        try:
+            return _download_bilibili(source, dest_dir)
+        except (OSError, KeyError, TypeError, ValueError,
+                subprocess.CalledProcessError) as exc:
+            logger.warning(f"Bilibili player API failed ({exc}); trying yt-dlp")
+    return _download_ytdlp(source, dest_dir)
+
+
+# The CDN answers 403 without a bilibili Referer.
+_BILI_HEADERS = {"Referer": "https://www.bilibili.com/"}
+
+
+def _bili_api(query: str) -> Any:
+    payload = _get_json(f"https://api.bilibili.com/x/player/{query}", _BILI_HEADERS)
+    if payload.get("code") != 0:
+        name = query.split("?")[0]
+        raise ValueError(f"{name}: code {payload.get('code')} {payload.get('message')}")
+    return payload["data"]
+
+
+def _fetch(url: str, dest: Path) -> None:
+    request = Request(url, headers={"User-Agent": _UA, **_BILI_HEADERS})
+    with urlopen(request, timeout=60) as response, dest.open("wb") as fh:
+        shutil.copyfileobj(response, fh, 1 << 20)
+
+
+def _download_bilibili(source: VideoSource, dest_dir: Path) -> Path:
+    """Best DASH video + audio from the web player API, muxed to source.mp4.
+
+    yt-dlp scrapes the video page, which Bilibili's risk control blocks
+    (HTTP 412, "Unable to extract initial state"). The player API that
+    browser downloaders call still answers anonymous requests without a WBI
+    signature; without login it tops out around 480p/720p, and the pipeline
+    only needs the audio anyway.
+    """
+    out = dest_dir / "source.mp4"
+    if out.exists():
+        return out
+    pages = _bili_api(f"pagelist?bvid={source.video_id}")
+    if not 1 <= source.page <= len(pages):
+        raise ValueError(f"{source.video_id} has {len(pages)} parts, no p={source.page}")
+    part = pages[source.page - 1]
+    dash = _bili_api(
+        f"playurl?bvid={source.video_id}&cid={part['cid']}&fnval=4048&fourk=1"
+    )["dash"]
+    # Highest quality first; within it prefer AVC, which every ffmpeg decodes.
+    video = max(dash["video"], key=lambda s: (s["id"], s["codecid"] == 7, s["bandwidth"]))
+    audio = max(dash["audio"], key=lambda s: s["bandwidth"])
+    logger.info(
+        f"Downloading bilibili:{source.video_id} p{source.page} via player API "
+        f"({video['height']}p): {part['part']}"
+    )
+    video_path, audio_path = dest_dir / "video.m4s", dest_dir / "audio.m4s"
+    _fetch(video["baseUrl"], video_path)
+    _fetch(audio["baseUrl"], audio_path)
+    tmp = dest_dir / "source.part.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", str(video_path), "-i", str(audio_path),
+         "-c", "copy", str(tmp)],
+        check=True,
+    )
+    tmp.replace(out)
+    video_path.unlink()
+    audio_path.unlink()
+    logger.success(f"Downloaded: {part['part']}")
+    return out
+
+
+def _download_ytdlp(source: VideoSource, dest_dir: Path) -> Path:
     import yt_dlp
 
-    dest_dir.mkdir(parents=True, exist_ok=True)
     outtmpl = str(dest_dir / "source.%(ext)s")
     opts: dict[str, Any] = {
         "outtmpl": outtmpl,

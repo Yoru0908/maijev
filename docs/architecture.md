@@ -16,7 +16,7 @@ work_dir/
 │   └── ...
 ├── asr.json                  # 合并后的统一 ASR payload
 ├── out.srt                   # 确定性基线 SRT
-├── download/                 # yt-dlp 下载的远程视频（远程来源时）
+├── download/                 # 远程来源下载的视频（B 站播放器接口 / yt-dlp）
 ├── source_meta.json          # 来源平台 / ID / URL / cast 名单（远程来源时）
 ├── reference_frames/         # 稀疏代表帧 + manifest（--extract-frames，可选）
 ├── jev_cache/                # Jev OCR 分类的 per-batch JSON 缓存（可选）
@@ -241,7 +241,7 @@ maijev/
 │   ├── frames.py               # 稀疏代表帧抽取（OCR/JEV 用）
 │   ├── jev.py                  # TypeSafe / Cloudflare Jev OCR 分类
 │   ├── llm.py                  # Vertex / AI Studio / OpenRouter client
-│   ├── source.py               # yt-dlp 远程来源 + TVer/Abema cast
+│   ├── source.py               # 远程来源下载（B 站播放器接口 / yt-dlp）+ TVer/Abema cast
 │   ├── pipeline.py             # CLI 编排入口
 │   ├── seg_lab.py              # 断句实验台
 │   └── gui/                    # 可选 Web GUI（FastAPI + 单页）

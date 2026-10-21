@@ -71,8 +71,8 @@ def run(
 
     # 0. resolve input: a missing local path is treated as a remote source
     #    (Bilibili BV… / TVer ep… / Abema 90-…_s…_p… / YouTube v=… or URL)
-    #    and downloaded via yt-dlp; TVer/Abema cast metadata is collected
-    #    here for the pre-pass.
+    #    and downloaded (Bilibili via its player API, the rest via yt-dlp);
+    #    TVer/Abema cast metadata is collected here for the pre-pass.
     input_path = Path(input_path)
     talents: list[str] = []
     if not input_path.exists():
