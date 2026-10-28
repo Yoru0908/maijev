@@ -210,7 +210,8 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 - **共享人工词库**：新建任务表单里选择词库，或填「词库名」后保存、删除 `glossaries/<名字>.md`（已在
   `.gitignore`），开始前保存好，第一遍翻译就会用上；点「开始」时未保存的修改会先自动保存。
 - **本任务人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」
-  在输入、模型和前序配置未变时复用 ASR / 合并 / pre-pass 缓存，词库变化使翻译缓存失效。
+  在输入、模型和前序配置未变时复用 ASR / 合并缓存；人工词库也是 pre-pass 的输入，词库变化会让
+  pre-pass 和翻译重新运行。
 - **人工词库分层**：`.env` 的 `TRANSLATE_GLOSSARY_PATH` < 共享词库 < 本任务词库，按原文
   去重、后者覆盖前者，合并结果写入 `glossary_effective.md` 并作为 `TRANSLATE_GLOSSARY_PATH`
   交给翻译；只有一层时直接使用该文件。三层整体优先于自动词库。
