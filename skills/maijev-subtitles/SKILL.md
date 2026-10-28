@@ -31,11 +31,12 @@ uv run python -m flows.maijev.pipeline "/path/to/input.mp4" "/path/to/runs/examp
 | `out.srt` | 原始 ASR 确定性断句基线 |
 | `out_llm_ja.srt` | 合并断句后的日文 |
 | `out_zh.srt` | 中文字幕；CLI 返回路径仍为此文件 |
-| `out_ja_zh.srt` | 双语 SRT：日文在上、中文在下，同一序号与时间轴 |
+| `out_ja_zh.srt` | 双语 SRT（`--bilingual`）：日文在上、中文在下，同一序号与时间轴；日文已按音频校正 |
+| `ja_corrections.json` | 日文校正记录（`--bilingual`）：每处的时间、原文、改后、理由 |
 | `glossary.md` | 自动词库（启用 pre-pass / OCR / cast 时） |
 | `timings.json` | 本次各阶段耗时；缓存运行耗时不代表首次处理速度 |
 
-双语导出由程序组装，不额外调用模型。旧任务使用原参数重跑即可复用缓存补齐文件。SRT 不写 ASS 的 `\fad` 等特效；如用户要 ASS 或烧录，另按 README 中 `burn` 的接口处理。
+用户要中日双语时加 `--bilingual`：翻译前多一次 Gemini 听音频校正日文（需 Gemini 原生接口，`CORRECT_MODEL` 可单独指定），日文、中文、双语都基于校正后的日文；不加时不输出 `out_ja_zh.srt`。校正有段失败时任务以错误结束且不输出双语，重跑只重试失败的段。旧任务使用原参数重跑即可复用缓存补齐文件。SRT 不写 ASS 的 `\fad` 等特效；如用户要 ASS 或烧录，另按 README 中 `burn` 的接口处理。
 
 ## 画面文字 → 共享词库
 
@@ -71,7 +72,7 @@ uv run python -m flows.maijev.pipeline "/path/to/input.mp4" "/path/to/runs/examp
                           每个翻译批次共用
 ```
 
-无 Jev 凭据时，OCR 原文直进 pre-pass；无 OCR 时，`--prepass` 仍可只用字幕全文。ASR 和字幕合并不接收 OCR，画面线索主要影响词库与译文，**不会自动纠正双语字幕中的日文原文**。
+无 Jev 凭据时，OCR 原文直进 pre-pass；无 OCR 时，`--prepass` 仍可只用字幕全文。ASR 和字幕合并不接收 OCR，画面线索主要影响词库与译文，不会改日文原文；改日文原文的只有 `--bilingual` 的听音频校正。
 
 OCR 和分类都可能出错。检查 `ocr_classification.json`、`ocr_context.txt`、`glossary.md` 与 pre-pass 缓存中的 `review` 项。尤其核对姓名是否真的属于同一个人；分类置信度不能代替 OCR 文字准确度。做效果对照时保持 ASR/合并文本和模型一致，明确词库使用的上下文范围。
 
@@ -86,7 +87,7 @@ TRANSLATE_GLOSSARY_PATH="/path/to/runs/example/glossary_user.md" \
 
 若原任务用了 `--ocr-json`、模型覆盖或其他选项，重跑时继续传入。人工词库优先于自动词库。ASR、合并、pre-pass 在输入与配置未变时命中缓存；修改词库使翻译缓存失效，因此只需重翻受影响的内容。不要删整个任务目录来“刷新”。
 
-对无法确定的人名、听不清的语句，列出证据和待校对点，不凭空补齐。人工修正日文后要同步检查双语对应关系，避免只改一个文件留下不一致结果。
+对无法确定的人名、听不清的语句，列出证据和待校对点，不凭空补齐。`--bilingual` 的每处校正都在 `ja_corrections.json`，交付前抽查其中改动较大的行。人工修正日文后要同步检查双语对应关系，避免只改一个文件留下不一致结果。
 
 ## GUI
 
@@ -94,7 +95,7 @@ TRANSLATE_GLOSSARY_PATH="/path/to/runs/example/glossary_user.md" \
 uv run python -m flows.maijev.gui --host 127.0.0.1 --port 8792 --runs "/path/to/runs"
 ```
 
-选择“日文 + 中文”会同时生成双语 SRT。任务完成后可预览、下载“中日双语 SRT”，并保留单语下载。常用译名写进新建任务表单的共享“人工词库”（`glossaries/<名字>.md`），开始前保存，第一遍翻译即生效；单个任务的修正写右侧“本任务人工词库”后点“保存并重翻”，同一原文以本任务为准。GUI 无鉴权，按用户需求在本机启动即可。
+选择“日文 + 中文”生成日文和中文 SRT；勾选“中日双语”才会先听音频校正日文并生成双语 SRT。任务完成后可预览、下载，并保留单语下载。常用译名写进新建任务表单的共享“人工词库”（`glossaries/<名字>.md`），开始前保存，第一遍翻译即生效；单个任务的修正写右侧“本任务人工词库”后点“保存并重翻”，同一原文以本任务为准。GUI 无鉴权，按用户需求在本机启动即可。
 
 ## 交付检查
 

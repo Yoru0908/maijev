@@ -6,7 +6,7 @@
 
 - **保留时间依据**：利用 MAI 的词级时间戳，由程序拆分带时间的小片段（atom），LLM 按语义分组，程序取回首尾时间。
 - **参考画面写法**：可选外部 OCR + Jev 筛选人名等线索，整理共享词库，减少翻译批次间的译名差异。
-- **方便反复校对**：分阶段缓存；修改词库后复用前序结果重翻，可导出日文、中文和中日双语 SRT。
+- **方便反复校对**：分阶段缓存；修改词库后复用前序结果重翻，可导出日文、中文 SRT；要中日双语时，先由 Gemini 听音频校正日文再导出。
 
 **基础流程只需 MAI + LLM，OCR 和 Jev 都不是必需项。** “无需修改时间轴”仅指收音良好、语音清晰素材下的使用体验，不代表所有视频都能免调轴；文字、翻译和专有名词仍需人工校对。
 
@@ -60,7 +60,7 @@ uv run python -m flows.maijev.gui
 打开 **http://127.0.0.1:8792**：
 
 1. 填写本地音视频路径，或 Bilibili、TVer、Abema、YouTube 的受支持链接。
-2. 选择「日文合并」生成日文底稿，或「日文 + 中文」生成单语和双语字幕。
+2. 选择「日文合并」生成日文底稿，或「日文 + 中文」生成日文和中文字幕；要中日双语时勾选「中日双语」，翻译前 Gemini 会先听音频校正日文（默认不勾）。
 3. 「合并模型」和「翻译模型」可以分别选择；留空则使用 `.env` 的设置。
 4. 点击「开始」，查看进度、日志、字幕预览并下载结果。
 
@@ -70,7 +70,7 @@ uv run python -m flows.maijev.gui
 
 翻译会酌情省略开头的「えっと」「なんか」等语气词，中文字幕的开始时间随之后移到第一个保留的词；整行只有语气词（如单独的「はい。」附和）时，中文字幕不出这一条，双语字幕只显示日文。回答提问的「はい」照常翻译。日文 `out_llm_ja.srt` 不受影响。
 
-GUI 的服务器模式与访问说明见 [进阶使用](docs/usage.md#web-gui可选)。
+左上角的版本号点开是[更新内容](CHANGELOG.md)，有新版本时会标「新」；报问题时请附上版本号。GUI 的服务器模式与访问说明见 [进阶使用](docs/usage.md#web-gui可选)。
 
 ## 命令行
 
@@ -80,8 +80,11 @@ GUI 的服务器模式与访问说明见 [进阶使用](docs/usage.md#web-gui可
 # 日文底稿：MAI 转录 + LLM 语义合并
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --llm-segment
 
-# 日文、中文和中日双语字幕；自动包含语义合并
+# 日文和中文字幕；自动包含语义合并
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate
+
+# 再加中日双语：翻译前 Gemini 先听音频校正日文（需要 Gemini 原生接口）
+uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass --bilingual
 
 # 翻译前用全片字幕生成共享词库，不需要 OCR
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass
@@ -92,7 +95,8 @@ uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --pre
 | `out.srt` | ASR 确定性断句基线 |
 | `out_llm_ja.srt` | LLM 合并后的日文底稿 |
 | `out_zh.srt` | 中文字幕（启用翻译时） |
-| `out_ja_zh.srt` | 日文在上、中文在下的双语字幕（启用翻译时，无额外模型调用） |
+| `out_ja_zh.srt` | 日文在上、中文在下的双语字幕（`--bilingual` 时；日文已按音频校正） |
+| `ja_corrections.json` | 日文校正记录：每处的时间、原文、改后和理由（`--bilingual` 时） |
 
 远程来源、OCR JSON 格式、抽帧和自定义词库见 [进阶使用](docs/usage.md)。完整参数可运行：
 
@@ -130,7 +134,7 @@ GUI / CLI / Agent Skill
                                                     ↓
                                               日文字幕底稿
                                                     ↓
-                                     共享词库 → LLM 翻译 → 中文 / 双语 SRT
+                  共享词库 →（中日双语：Gemini 听音频校正日文）→ LLM 翻译 → 中文 / 双语 SRT
 ```
 
 atom 是带时间的小片段，可以包含多个词。LLM 返回分组或翻译文本，程序校验 ID、恢复时间并输出字幕；LLM 不生成最终时间戳。

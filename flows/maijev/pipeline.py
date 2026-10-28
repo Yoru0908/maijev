@@ -10,7 +10,9 @@ Stages (all resumable — chunk JSONs and wav slices are cached):
     4. merge     → work_dir/asr.json (ElevenLabs-shaped payload)
     5. srt       → work_dir/out.srt via services.elevenlabs.srt_builder
     6. llm       (optional) LLM merge → out_llm_ja.srt;
-                 --translate adds out_zh.srt and out_ja_zh.srt (bilingual)
+                 --translate adds out_zh.srt; --bilingual first has Gemini
+                 correct the Japanese against the audio, then adds
+                 out_ja_zh.srt (bilingual) and ja_corrections.json
 """
 
 from __future__ import annotations
@@ -42,7 +44,12 @@ from .chunker import (  # noqa: E402
 )
 from .merge import merge_chunks  # noqa: E402
 from .transcriber import transcribe_chunk  # noqa: E402
-from .llm import SUPPORTED_MODELS, check_model, resolve_model, validate_model  # noqa: E402
+from .llm import (  # noqa: E402
+    SUPPORTED_MODELS, check_audio_model, check_model, resolve_model, validate_model,
+)
+from . import glossary  # noqa: E402
+from .correct import correct_lines, correct_model  # noqa: E402
+from .version import describe  # noqa: E402
 from .jev import JevClient, load_ocr_items, render_context  # noqa: E402
 from .frames import prepare_reference_frames  # noqa: E402
 from .segment_llm import parse_gap  # noqa: E402
@@ -58,16 +65,22 @@ def run(
     ocr_json: Path | None = None,
     extract_frames: bool = False,
     prepass: bool = False,
+    bilingual: bool = False,
 ) -> Path:
+    logger.info(f"maijev {describe()}")
+    translate = translate or bilingual
     if llm_segment or translate:
         check_model(resolve_model("SEGMENT_MODEL"))
         if translate:
             check_model(resolve_model("TRANSLATE_MODEL"))
             if prepass or ocr_json:
                 check_model(os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL"))
+        if bilingual:
+            check_audio_model(correct_model())
     work_dir.mkdir(parents=True, exist_ok=True)
     run_t0 = time.perf_counter()
     timings: dict[str, float] = {}
+    failed: list[str] = []  # audio-correction segments that got no answer
 
     # 0. resolve input: a missing local path is treated as a remote source
     #    (Bilibili BV… / TVer ep… / Abema 90-…_s…_p… / YouTube v=… or URL)
@@ -210,9 +223,14 @@ def run(
         result_path = ja_srt
 
         if translate:
+            # Bilingual outputs are cleared up front and written only on
+            # success, so a re-run never leaves a stale or uncorrected file.
+            for name in ("out_ja_zh.srt", "ja_corrections.json"):
+                (work_dir / name).unlink(missing_ok=True)
             # Shared text-only pre-pass: JEV-filtered OCR anchors + merged
             # lines -> glossary.md, injected into every translate batch.
             glossary_path = work_dir / "glossary.md"
+            doubts: list[str] = []
             if ocr_json is not None or prepass or talents:
                 # Cast names from source metadata are authoritative person
                 # anchors — they bypass JEV and go straight to the pre-pass.
@@ -221,18 +239,22 @@ def run(
                     for t in talents
                 ]
                 prepass_t0 = time.perf_counter()
-                glossary_path.write_text(
-                    run_prepass(
-                        ocr_items,
-                        jev_results,
-                        lines,
-                        extra_anchors=cast_anchors,
-                        cache_dir=work_dir / "prepass_cache",
-                    )
-                    + "\n",
-                    encoding="utf-8",
+                text, doubts = run_prepass(
+                    ocr_items,
+                    jev_results,
+                    lines,
+                    extra_anchors=cast_anchors,
+                    cache_dir=work_dir / "prepass_cache",
                 )
+                glossary_path.write_text(text + "\n", encoding="utf-8")
                 timings["prepass_seconds"] = time.perf_counter() - prepass_t0
+            if bilingual:
+                lines, failed = _correct(
+                    lines, wav_path, glossary_path, doubts, work_dir, timings
+                )
+                ja_srt.write_text(
+                    render_srt(lines, [l.text for l in lines]), encoding="utf-8"
+                )
 
             translate_t0 = time.perf_counter()
             zh, heads = translate_lines_with_heads(
@@ -251,11 +273,12 @@ def run(
             zh_srt = work_dir / "out_zh.srt"
             zh_srt.write_text(render_srt(zh_lines, zh), encoding="utf-8")
             logger.success(f"ZH SRT: {zh_srt}")
-            bilingual_srt = work_dir / "out_ja_zh.srt"
-            bilingual_srt.write_text(
-                render_srt(zh_lines, zh, bilingual=True), encoding="utf-8"
-            )
-            logger.success(f"JA/ZH bilingual SRT: {bilingual_srt}")
+            if bilingual and not failed:
+                bilingual_srt = work_dir / "out_ja_zh.srt"
+                bilingual_srt.write_text(
+                    render_srt(zh_lines, zh, bilingual=True), encoding="utf-8"
+                )
+                logger.success(f"JA/ZH bilingual SRT: {bilingual_srt}")
             result_path = zh_srt
 
     timings["wall_seconds"] = time.perf_counter() - run_t0
@@ -263,7 +286,32 @@ def run(
         json.dumps(timings, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     logger.info(f"Stage timings → {work_dir / 'timings.json'}: {timings}")
+    if failed:
+        raise RuntimeError(
+            f"日文校正有 {len(failed)} 段失败（{', '.join(failed)}）：日文、中文字幕已输出，"
+            "中日双语未输出；重新运行会从缓存继续"
+        )
     return result_path
+
+
+def _correct(lines, wav_path: Path, glossary_path: Path, doubts: list[str],
+             work_dir: Path, timings: dict) -> tuple[list, list[str]]:
+    """Gemini fixes misheard Japanese by ear; edits go to ja_corrections.json."""
+    t0 = time.perf_counter()
+    table = glossary.load(glossary_path if glossary_path.exists() else None)
+    lines, edits, failed = correct_lines(
+        lines, wav_path, table, doubts, work_dir / "correct_cache"
+    )
+    timings["correct_seconds"] = time.perf_counter() - t0
+    (work_dir / "ja_corrections.json").write_text(
+        json.dumps({"model": correct_model(), "failed": failed, "edits": edits},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    for e in edits:
+        mark = "" if e["applied"] else "（未采用：改动过大）"
+        logger.info(f"correct {e['time']} {e['before']} → {e['after']}{mark}")
+    return lines, failed
 
 
 def main() -> None:
@@ -278,7 +326,13 @@ def main() -> None:
     parser.add_argument("--llm-segment", action="store_true",
                         help="LLM merge pass over utterances")
     parser.add_argument("--translate", action="store_true",
-                        help="export JA, ZH and bilingual JA/ZH SRT (implies segment)")
+                        help="export JA and ZH SRT (implies segment)")
+    parser.add_argument(
+        "--bilingual",
+        action="store_true",
+        help="also export bilingual JA/ZH SRT; Gemini first corrects the "
+        "Japanese against the audio (implies --translate; CORRECT_MODEL)",
+    )
     parser.add_argument(
         "--extract-frames",
         action="store_true",
@@ -335,8 +389,9 @@ def main() -> None:
         args.input,
         args.work_dir,
         args.srt,
-        llm_segment=args.llm_segment or args.translate,
+        llm_segment=args.llm_segment or args.translate or args.bilingual,
         translate=args.translate,
+        bilingual=args.bilingual,
         ocr_json=args.ocr_json,
         extract_frames=args.extract_frames,
         prepass=args.prepass,

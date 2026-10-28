@@ -35,7 +35,26 @@ async function loadEnv() {
   $('#ocrHint').textContent = env.jev
     ? `有 Jev（${env.jev}）：OCR 先分类筛选再进 pre-pass。`
     : '没有 Jev 凭据：OCR 原文直接进 pre-pass，同样可用。';
+  showVersion();
 }
+
+/* ---------- version + changelog ---------- */
+const seenVersion = () => { try { return localStorage.getItem('maijev.version'); } catch { return null; } };
+function showVersion() {
+  const btn = $('#verBtn');
+  btn.textContent = `v${env.version}`;
+  btn.classList.toggle('new', seenVersion() !== env.version);
+  const code = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+  $('#verTitle').textContent = `更新内容 · 当前 v${env.version}`;
+  $('#verBody').innerHTML = (env.changelog || []).map((sec) =>
+    `<h3>${esc(sec.title)}</h3><ul>${sec.items.map((i) => `<li>${code(i)}</li>`).join('')}</ul>`).join('');
+}
+$('#verBtn').onclick = () => {
+  $('#verDlg').showModal();
+  $('#verBtn').classList.remove('new');
+  try { localStorage.setItem('maijev.version', env.version); } catch {}
+};
+$('#verClose').onclick = () => $('#verDlg').close();
 
 /* ---------- file browser ---------- */
 async function browse(path) {
@@ -132,6 +151,7 @@ $('#startBtn').onclick = async () => {
     input, mode,
     name: $('#name').value.trim() || null,
     prepass: $('#prepass').checked,
+    bilingual: $('#bilingual').checked,
     ocr_json: $('#ocr').value.trim() || null,
     extract_frames: $('#frames').checked,
     segment_model: $('#segmentModel').value || null,
@@ -173,8 +193,9 @@ function stageModel(s) {
     { n: '02', t: 'ASR', done: s.asr, sub: s.chunks_total ? `${s.chunks_done}/${s.chunks_total} chunks` : '' },
     { n: '03', t: '合并', done: s.ja, skip: m === 'asr', sub: s.merge_batches ? `${s.merge_batches} batch` : '' },
     { n: '04', t: '词库', done: s.glossary, skip: !wantGloss, sub: s.glossary ? 'glossary.md' : '' },
-    { n: '05', t: '翻译', done: s.zh, skip: m !== 'zh', sub: s.zh_batches ? `${s.zh_batches} batch` : '' },
-    { n: '06', t: '完成', done: s.finished, sub: s.finished && s.timings ? `${Math.round(s.timings.wall_seconds)}s` : '' },
+    { n: '05', t: '校正', done: s.corrected, skip: !(m === 'zh' && job.bilingual), sub: s.corrected ? `改 ${s.fixed} 行` : '' },
+    { n: '06', t: '翻译', done: s.zh, skip: m !== 'zh', sub: s.zh_batches ? `${s.zh_batches} batch` : '' },
+    { n: '07', t: '完成', done: s.finished, sub: s.finished && s.timings ? `${Math.round(s.timings.wall_seconds)}s` : '' },
   ];
   let activeSet = false;
   for (const x of st) {
@@ -200,7 +221,7 @@ function renderState(s) {
     loadGlossary(s.id);
   }
   const job = s.job || {};
-  $('.src', d).textContent = [job.input, job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.max_gap && `停顿≥${job.max_gap}s 分行`, job.glossary && `词库=${job.glossary}`, job.ocr_json && 'ocr', job.prepass && 'prepass'].filter(Boolean).join('  ·  ');
+  $('.src', d).textContent = [job.input, job.model && `model=${job.model}`, job.segment_model && `合并=${job.segment_model}`, job.translate_model && `翻译=${job.translate_model}`, job.max_gap && `停顿≥${job.max_gap}s 分行`, job.glossary && `词库=${job.glossary}`, job.ocr_json && 'ocr', job.prepass && 'prepass', job.bilingual && '中日双语', job.version && `v${job.version}`].filter(Boolean).join('  ·  ');
   $('.cancelBtn', d).disabled = !s.running;
   $('.rerunBtn', d).disabled = s.running || !job.input;
   $('.saveRerun', d).disabled = s.running || !job.input;
@@ -213,12 +234,13 @@ function renderState(s) {
   if (t.asr_seconds) facts.push(`ASR <b>${t.asr_seconds.toFixed(0)}s</b>`);
   if (t.merge_seconds) facts.push(`合并 <b>${t.merge_seconds.toFixed(0)}s</b>`);
   if (t.prepass_seconds) facts.push(`pre-pass <b>${t.prepass_seconds.toFixed(0)}s</b>`);
+  if (t.correct_seconds) facts.push(`校正 <b>${t.correct_seconds.toFixed(0)}s</b>`);
   if (t.translate_seconds) facts.push(`翻译 <b>${t.translate_seconds.toFixed(0)}s</b>`);
   if (s.cost_usd != null) facts.push(`ASR 费用 <b>$${s.cost_usd.toFixed(4)}</b>`);
   $('.facts', d).innerHTML = facts.map((f) => `<div class="fact">${f}</div>`).join('');
 
   const main = s.bilingual ? 'out_ja_zh.srt' : s.zh ? 'out_zh.srt' : s.ja ? 'out_llm_ja.srt' : s.asr ? 'out.srt' : null;
-  const fileLabels = {'out_ja_zh.srt': '中日双语 SRT', 'out_zh.srt': '中文 SRT', 'out_llm_ja.srt': '日文 SRT', 'out.srt': 'ASR 原始 SRT', 'glossary_effective.md': '合并后人工词库'};
+  const fileLabels = {'out_ja_zh.srt': '中日双语 SRT', 'out_zh.srt': '中文 SRT', 'out_llm_ja.srt': '日文 SRT', 'out.srt': 'ASR 原始 SRT', 'glossary_effective.md': '合并后人工词库', 'ja_corrections.json': '日文校正记录'};
   $('.files', d).innerHTML = s.files.filter((f) => f.endsWith('.srt') || f in fileLabels || f === 'timings.json' || f === 'source_meta.json')
     .map((f) => `<a class="${f === main ? 'main' : ''}" href="/api/jobs/${s.id}/files/${f}?download=1">↓ ${fileLabels[f] || f}</a>`).join('');
   if (main && $('.srt', d).dataset.file !== main + s.mtime) {

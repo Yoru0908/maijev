@@ -34,6 +34,9 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
 | `PREPASS_PROMPT_PATH` | 可选：用仓库外的 pre-pass prompt 代替 `prepass_prompt.md`（输出须是同一 JSON 结构） |
+| `CORRECT_MODEL` | 中日双语的日文校正（听音频）阶段模型；未设置时跟随翻译模型。必须是 Gemini，且走 Gemini 原生接口 |
+| `CORRECT_PROMPT_PATH` | 可选：用仓库外的校正 prompt 代替 `correct_prompt.md`（输出须是同一 JSON 结构） |
+| `CORRECT_SEGMENT_SECONDS` | 校正时每次请求送多长的音频，默认 `600`（按字幕行边界切） |
 | `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `LLM_TIMEOUT` | 单次 LLM 请求超时秒数，默认 `1800` |
@@ -45,7 +48,9 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 模型解析顺序：`阶段_MODEL` → `GEMINI_MODEL` → 内置默认。合并和翻译可以用不同模型：
 `.env` 里分别设 `SEGMENT_MODEL` / `TRANSLATE_MODEL`，或单次运行时用 CLI 的
 `--segment-model` / `--translate-model`、GUI 的「合并模型」「翻译模型」；后两者会覆盖
-`.env` 的阶段设置。pre-pass 未单独设置 `PREPASS_MODEL` 时跟随翻译模型。项目主推并默认使用
+`.env` 的阶段设置。pre-pass 未单独设置 `PREPASS_MODEL`、日文校正未单独设置 `CORRECT_MODEL` 时都跟随翻译模型。
+日文校正要把音频发给模型，只有 Gemini 原生接口（`GEMINI_AGENT_PLATFORM_API_KEY` / `GEMINI_API_KEY`）支持；
+只配了中转或 OpenRouter 时，勾选中日双语会在下载 / 听写前报错。项目主推并默认使用
 `gemini-3.8-flash`。只允许通过 `--model` 或上述变量选择 `gemini-3.8-flash`、`gemini-4-argon` 或 `gemini-3.1-pro-preview`；其他值在下载/听写前报错。可用性、价格和
 输出上限以所选服务商为准，修改配置后先用短片验证。
 

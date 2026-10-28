@@ -102,8 +102,11 @@ def run_prepass(
     *,
     extra_anchors: list[dict[str, Any]] | None = None,
     cache_dir: Path | None = None,
-) -> str:
-    """Run the shared text-only pre-pass; return glossary text.
+) -> tuple[str, list[str]]:
+    """Run the shared text-only pre-pass; return (glossary text, doubts).
+
+    Doubts are the review spellings only — the reasons are text-only guesses
+    and stay out of the audio correction, which must decide by ear.
 
     Called once per run when ``--ocr-json`` or ``--prepass`` is given.
     ``results=None`` means JEV never ran and ``items`` are raw OCR text.
@@ -143,12 +146,15 @@ def run_prepass(
                 encoding="utf-8",
             )
     text = render_glossary(result)
-    review_n = (
-        len(result.get("review") or []) if isinstance(result, dict) else 0
-    )
+    review = result.get("review") if isinstance(result, dict) else None
+    doubts = [
+        str(r.get("src")).strip()
+        for r in (review if isinstance(review, list) else [])
+        if isinstance(r, dict) and str(r.get("src") or "").strip()
+    ]
     logger.info(
         f"pre-pass: {len(anchors)} anchors + {len(lines)} lines -> "
         f"{sum('->' in row for row in text.splitlines())} entities, "
-        f"{review_n} review items"
+        f"{len(doubts)} review items"
     )
-    return text
+    return text, doubts

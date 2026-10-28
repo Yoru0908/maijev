@@ -188,6 +188,28 @@ export TRANSLATE_GLOSSARY_PATH=/path/to/private-glossary.md
 不设置该变量时，仍会使用工作目录中已有的自动词库。
 词库内容会发送给所配置的翻译模型；文件由使用者自行维护，不应提交私人词库。
 
+## 中日双语：听音频校正日文
+
+只看文字的 pre-pass 能发现可疑写法，却无法确认原话，翻译模型也只能按上下文猜；
+所以中文可能是对的，双语里的日文却仍是听错的写法。勾选「中日双语」（CLI `--bilingual`）
+后，在 pre-pass 之后、翻译之前多一步：
+
+```text
+合并后的日文行 + 音频片段（按字幕行边界切，默认每段 10 分钟，Ogg/Opus 32 kbps）
+  + 本片资料（自动词库和人工词库的日文写法，不含中文译名）
+  + 重点确认（pre-pass review 里的可疑写法，不含它的猜测理由）
+  → Gemini 听音频，只返回需要改的行 {"edits": [{"id", "ja", "reason"}]}
+  → 程序按 id 改文字，不增删行、不动时间
+  → out_llm_ja.srt 改写为校正后的日文 → 翻译 → out_zh.srt / out_ja_zh.srt
+```
+
+- 每处修改写进 `ja_corrections.json`（时间、原文、改后、理由），可以逐条对照音频核对；
+  改后比原文长一倍以上的会被拒绝（记为 `applied: false`），因为那是在补句子而不是改错。
+- 某一段请求失败时，其余段照常校正，日文和中文字幕照常输出，但**不输出中日双语**，
+  任务以错误结束；重新运行时成功的段从 `correct_cache/` 读取，只重试失败的段。
+- 费用：Gemini 按约 32 token/秒计音频，1 小时约 11.5 万输入 token，加上字幕文字。
+- 只支持 Gemini 原生接口；`CORRECT_MODEL` 可单独指定模型，见 [配置](configuration.md)。
+
 ## Web GUI（可选）
 
 <a id="web-gui可选"></a>
@@ -205,8 +227,9 @@ GUI 是 CLI 的薄壳：每个任务就是一个 `python -m flows.maijev.pipelin
 本身零改动。功能：
 
 - 选本地文件（可浏览服务器目录）或粘贴 BV / TVer / Abema / YouTube 来源。
-- 六阶段进度（音频 → ASR n/m → 合并 → 词库 → 翻译 → 完成）+ 实时日志。
-- 下载 `out_ja_zh.srt`（中日双语）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt`；优先预览双语文件，旧任务仍支持单语预览。
+- 七阶段进度（音频 → ASR n/m → 合并 → 词库 → 校正 → 翻译 → 完成）+ 实时日志；没勾中日双语时跳过「校正」。
+- 下载 `out_ja_zh.srt`（中日双语，勾选时）/ `out_zh.srt` / `out_llm_ja.srt` / `out.srt` / `ja_corrections.json`（日文校正记录）；有双语文件时优先预览它。
+- 左上角显示版本号（括号里是 git 提交号），点开是 [CHANGELOG.md](../CHANGELOG.md) 的更新内容。
 - **共享人工词库**：新建任务表单里选择词库，或填「词库名」后保存、删除 `glossaries/<名字>.md`（已在
   `.gitignore`），开始前保存好，第一遍翻译就会用上；点「开始」时未保存的修改会先自动保存。
 - **本任务人工词库**：右侧编辑 `glossary_user.md`（`原文 -> 写法`），「保存并重翻」

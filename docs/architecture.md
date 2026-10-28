@@ -25,10 +25,12 @@ work_dir/
 ├── prepass_cache/            # pre-pass 响应缓存（可选）
 ├── glossary.md               # pre-pass 产出的自动词库（可选）
 ├── merge_cache/              # merge LLM 的 per-batch JSON 缓存
-├── out_llm_ja.srt            # LLM 合并后的日文 SRT
+├── out_llm_ja.srt            # LLM 合并后的日文 SRT（--bilingual 时为校正后的日文）
+├── correct_cache/            # 日文校正的音频片段（.ogg）与 per-segment 响应缓存（--bilingual）
+├── ja_corrections.json       # 日文校正记录：模型、失败段、每处修改（--bilingual）
 ├── zh_cache/                 # translation LLM 的 per-batch JSON 缓存
 ├── out_zh.srt                # 中文字幕
-├── out_ja_zh.srt             # 日文在上、中文在下的双语字幕
+├── out_ja_zh.srt             # 日文在上、中文在下的双语字幕（--bilingual）
 └── timings.json              # 阶段耗时
 ```
 
@@ -39,6 +41,8 @@ work_dir/
 - `zh_cache/` 按字幕行内容 + system prompt（含合并后的术语表）+ model hash 缓存
   翻译结果。
 - `prepass_cache/` 按 OCR anchor + 日文行 + system prompt + model hash 缓存。
+- `correct_cache/` 按音频片段 + 日文行 + 本片资料 + system prompt + model hash 缓存；
+  失败的段不缓存。
 - prompt、模型或词库变更都会使对应缓存自动失效，无需手动删除。
 - 已完成的 ASR chunk 不需要删除。
 
@@ -164,6 +168,16 @@ LLM 返回**完整分区**：每个 atom 恰好出现一次，独立成条的 at
 LLM 不接收也不生成最终 SRT 时间戳。如果 merge batch 连续失败，程序直接报错，
 不会把失败 batch 静默伪装成成功结果。
 
+### 可选：中日双语的日文校正（`--bilingual`）
+
+pre-pass 之后、翻译之前，`correct.py` 按字幕行边界把音频切成不超过
+`CORRECT_SEGMENT_SECONDS`（默认 600）的片段，每段一次 Gemini 请求：音频以
+`inlineData`（`audio/ogg`）随请求发送，文字部分是本片资料、重点确认和
+`id<TAB>相对时间<TAB>日文`。模型只返回要改的行，程序按 id 替换文字，行数和时间不变。
+校正后的日文写回 `out_llm_ja.srt`，再进入翻译；`trim_heads` 在改动过的行首匹配不上
+逐字时间时保持原时间。设计取舍见 [HISTORY.md](../HISTORY.md) §9，用法见
+[进阶使用](usage.md#中日双语听音频校正日文)。
+
 ### 5. 中文翻译
 
 翻译阶段接收已经合并后的日文字幕行：
@@ -192,7 +206,7 @@ id<TAB>日文字幕文本
 MergedLine + translated zh + 核对后的 skip_head
   → trim_heads()：用 MAI 逐字时间把中文 cue 的开始挪到省略部分之后（提前 0.1s，剩余不足 0.5s 不挪）
   → render_srt()
-  → out_zh.srt / out_ja_zh.srt（out_llm_ja.srt 保持原时间）
+  → out_zh.srt / out_ja_zh.srt（out_ja_zh.srt 仅 --bilingual；out_llm_ja.srt 保持原时间）
 ```
 
 程序只信任 `skip_head` 开头由语气词组成、并在标点处结束的部分（`_filler_head`），
@@ -240,6 +254,9 @@ maijev/
 │   ├── translate_prompt.md     # 通用日译中翻译 prompt
 │   ├── prepass.py              # 纯文本 pre-pass → glossary.md
 │   ├── prepass_prompt.md       # pre-pass 词库生成 prompt
+│   ├── correct.py              # 中日双语：Gemini 听音频校正日文
+│   ├── correct_prompt.md       # 日文校正 prompt
+│   ├── version.py              # 版本号（pyproject + git 提交号）与 CHANGELOG 解析
 │   ├── frames.py               # 稀疏代表帧抽取（OCR/JEV 用）
 │   ├── jev.py                  # TypeSafe / Cloudflare Jev OCR 分类
 │   ├── llm.py                  # Vertex / AI Studio / OpenRouter client

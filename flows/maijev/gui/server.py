@@ -38,7 +38,10 @@ ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT))
 
-from flows.maijev.llm import DEFAULT_MODEL, SUPPORTED_MODELS, check_model, validate_model  # noqa: E402
+from flows.maijev.llm import (  # noqa: E402
+    DEFAULT_MODEL, SUPPORTED_MODELS, check_audio_model, check_model, validate_model,
+)
+from flows.maijev.version import changelog, describe  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
 RUNS = ROOT / "runs"
@@ -50,7 +53,7 @@ SAFE_NAME = re.compile(r"[^\w.\-]+")
 BAD_GLOSSARY_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 MEDIA_EXT = {".mp4", ".mkv", ".mov", ".ts", ".m4a", ".mp3", ".wav", ".flac", ".aac", ".webm"}
 FILES = [
-    "out_ja_zh.srt", "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md",
+    "out_ja_zh.srt", "out_zh.srt", "out_llm_ja.srt", "out.srt", "glossary.md", "ja_corrections.json",
     "glossary_user.md", "glossary_effective.md", "timings.json", "source_meta.json",
     "job.json", "gui.log",
 ]
@@ -63,6 +66,7 @@ class JobRequest(BaseModel):
     name: str | None = None
     mode: Literal["asr", "ja", "zh"] = "zh"
     prepass: bool = True
+    bilingual: bool = False
     ocr_json: str | None = None
     extract_frames: bool = False
     model: str | None = None
@@ -154,6 +158,7 @@ def _snapshot(wd: Path) -> dict:
     manifest = _read_json(wd / "chunks" / "manifest.json") or []
     timings = _read_json(wd / "timings.json")
     job = _read_json(wd / "job.json") or {}
+    corrections = _read_json(wd / "ja_corrections.json") or {}
     # On re-runs every output file already exists; only a timings.json
     # written after this launch means the current run actually finished.
     finished = (
@@ -181,6 +186,8 @@ def _snapshot(wd: Path) -> dict:
         "zh_batches": _count(wd / "zh_cache", "*.json"),
         "zh": (wd / "out_zh.srt").exists(),
         "bilingual": (wd / "out_ja_zh.srt").exists(),
+        "corrected": bool(corrections) and not corrections.get("failed"),
+        "fixed": sum(bool(e.get("applied")) for e in corrections.get("edits", [])),
         "timings": timings,
         "cost_usd": _asr_cost(wd) if timings else None,
         "files": [n for n in FILES if (wd / n).exists()],
@@ -203,6 +210,8 @@ def _launch(wd: Path, req: JobRequest) -> None:
                 check_model(translation)
                 if req.prepass or req.ocr_json:
                     check_model(os.environ.get("PREPASS_MODEL") or translation)
+                if req.bilingual:
+                    check_audio_model(os.environ.get("CORRECT_MODEL") or translation)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     shared = _glossary_file(req.glossary) if req.glossary else None
@@ -213,6 +222,8 @@ def _launch(wd: Path, req: JobRequest) -> None:
         cmd.append("--translate")
         if req.prepass:
             cmd.append("--prepass")
+        if req.bilingual:
+            cmd.append("--bilingual")
     elif req.mode == "ja":
         cmd.append("--llm-segment")
     if req.ocr_json:
@@ -237,7 +248,8 @@ def _launch(wd: Path, req: JobRequest) -> None:
     if manual:
         env["TRANSLATE_GLOSSARY_PATH"] = str(manual)
     (wd / "job.json").write_text(
-        json.dumps({**req.model_dump(), "started": time.time()}, ensure_ascii=False, indent=2),
+        json.dumps({**req.model_dump(), "version": describe(), "started": time.time()},
+                   ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     log = (wd / "gui.log").open("a", encoding="utf-8")
@@ -283,6 +295,8 @@ def env_status():
         or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "supported_models": list(SUPPORTED_MODELS),
         "runs": str(RUNS),
+        "version": describe(),
+        "changelog": changelog(),
     }
 
 

@@ -164,3 +164,19 @@ def test_request_timeout_defaults_long_and_follows_env(monkeypatch, sent):
     monkeypatch.setenv("LLM_TIMEOUT", "300")
     llm.generate("p", model="gpt-6.1-sol")
     assert seen == [1800, 300]
+
+
+def test_audio_parts_go_to_native_gemini_only(monkeypatch, sent):
+    audio = {"inlineData": {"mimeType": "audio/ogg", "data": "QUJD"}}
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    assert llm.generate_json("p", model="gemini-3.1-pro-preview", parts=[audio]) == {"ok": 1}
+    assert sent[0]["body"]["contents"][0]["parts"] == [audio, {"text": "p"}]
+    assert llm.check_audio_model("gemini-3.8-flash") == "gemini-3.8-flash"
+
+    monkeypatch.delenv("GEMINI_API_KEY")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or")
+    with pytest.raises(RuntimeError, match="only native Gemini"):
+        llm.generate("p", model="gemini-3.8-flash", parts=[audio])
+    with pytest.raises(ValueError, match="Gemini 原生接口"):
+        llm.check_audio_model("gemini-3.8-flash")
+    assert len(sent) == 1

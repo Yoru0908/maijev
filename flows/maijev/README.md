@@ -26,6 +26,7 @@ work_dir    工作目录和输出目录
 --srt       确定性基线 SRT 的可选路径
 --llm-segment 运行 LLM 合并
 --translate    运行中文翻译，同时自动启用 LLM 合并
+--bilingual    翻译前让 Gemini 听音频校正日文，再输出中日双语（包含 --translate）
 ```
 
 ## 输出
@@ -45,6 +46,9 @@ work_dir/
 ├── out_zh.srt
 ├── prepass_cache/          # --ocr-json / --prepass 时存在
 ├── glossary.md             # pre-pass 产出的自动词库
+├── correct_cache/          # --bilingual：音频片段与校正响应缓存
+├── ja_corrections.json     # --bilingual：日文校正记录
+├── out_ja_zh.srt           # --bilingual：中日双语
 └── timings.json
 ```
 
@@ -67,6 +71,9 @@ prompt、模型或词库变更会自动失效，不需要手动删除。ASR chun
 | `jev.py` | Cloudflare Jev OCR 分类 |
 | `prepass.py` | 纯文本 pre-pass：OCR anchor + 日文行 → glossary.md |
 | `prepass_prompt.md` | pre-pass 词库生成 prompt |
+| `correct.py` | 中日双语：按字幕行切音频，Gemini 听音频校正日文 |
+| `correct_prompt.md` | 日文校正 prompt |
+| `version.py` | 版本号（pyproject + git 提交号）与 CHANGELOG 解析 |
 | `seg_lab.py` | atom 和 merge prompt 实验台 |
 | `llm.py` | Vertex、AI Studio、OpenRouter LLM client |
 | `pipeline.py` | CLI 编排入口 |

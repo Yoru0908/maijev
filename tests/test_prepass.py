@@ -119,10 +119,12 @@ def test_prepass_reads_private_prompt_and_human_glossaries(monkeypatch, tmp_path
         seen.update(body=body, system=kwargs["system"])
         return {"theme": "深夜电台", "entities": [{
             "kind": "program", "ja": "オールナイトニッポン0",
-            "variants": ["オールナイトニッポンゼロ"], "tgt": "ANN0"}]}
+            "variants": ["オールナイトニッポンゼロ"], "tgt": "ANN0"}],
+            "review": [{"src": "今井さん", "reason": "猜测"}, {"reason": "无 src"}, "x"]}
 
     monkeypatch.setattr(prepass, "generate_json", fake_generate)
-    text = prepass.run_prepass([], None, [MergedLine(0, 1, "こんばんは", [0])])
+    text, doubts = prepass.run_prepass([], None, [MergedLine(0, 1, "こんばんは", [0])])
+    assert doubts == ["今井さん"]
     assert seen["system"] == "私有预分析 prompt"
     assert seen["body"].startswith("【附录：静态词库】\nオールナイトニッポン0 -> ANN0\n")
     assert text.splitlines() == [

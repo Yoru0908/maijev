@@ -55,6 +55,14 @@
   .chip.no { border-color: #fecaca; background: #fef2f2; color: var(--err); }
   header .spacer { flex: 1; }
   header .runs { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+  .ver { font-family: var(--mono); font-size: 11.5px; padding: 2px 10px; border-radius: 999px; color: var(--dim); position: relative; }
+  .ver.new::after { content: '新'; position: absolute; top: -7px; right: -8px; font-size: 10px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; }
+  dialog.notes { margin: auto; overflow: auto; border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; width: min(640px, calc(100vw - 32px)); max-height: 80vh; color: var(--fg); background: var(--card); }
+  dialog.notes::backdrop { background: rgba(30,41,59,.35); }
+  dialog.notes .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  dialog.notes h3 { font-size: 14px; margin: 14px 0 6px; }
+  dialog.notes ul { padding-left: 18px; }
+  dialog.notes li { margin: 4px 0; }
 
   main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px 24px; min-height: calc(100vh - 57px); }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: 0 6px 24px -14px rgba(30,41,59,.14); }
@@ -129,6 +137,7 @@
 <body>
 <header>
   <h1>mai<em>jev</em></h1>
+  <button class="ver" id="verBtn" title="更新内容">版本</button>
   <div class="chips" id="envChips"></div>
   <div class="spacer"></div>
   <div class="runs" id="runsDir"></div>
@@ -166,6 +175,8 @@
         <div class="hint" id="glossHint"></div>
         <label class="check"><input type="checkbox" id="prepass" checked> 生成自动词库（pre-pass）</label>
         <div class="hint">不需要 OCR。用字幕全文归并人名/地名/节目名；人工词库与它冲突时以人工为准。</div>
+        <label class="check"><input type="checkbox" id="bilingual"> 中日双语（Gemini 听音频校正日文）</label>
+        <div class="hint">翻译前先让 Gemini 听音频改正听错的日文，日文、中文、双语字幕都用校正后的日文；每处修改记在 ja_corrections.json。多一次 Gemini 调用（1 小时音频约 11.5 万 token），需要 Gemini 原生接口。不勾只输出日文和中文字幕。</div>
         <label>OCR JSON（可选）</label>
         <input type="text" id="ocr" placeholder="外部 OCR 产出的 ocr.json 路径">
         <div class="hint" id="ocrHint"></div>
@@ -241,7 +252,7 @@
       <h2>本任务人工词库 <span class="hint" style="display:inline">glossary_user.md · 优先于共享词库和自动词库</span></h2>
       <textarea class="glossUser" rows="10" placeholder="只对这个任务生效的修正，同一原文覆盖共享词库&#10;原文 -> 写法&#10;ねこがみ -> 猫神"></textarea>
       <div class="glossary-actions">
-        <div class="hint">保存后重跑：ASR / 合并命中缓存；人工词库也会交给 pre-pass，所以 pre-pass 和翻译重新运行。</div>
+        <div class="hint">保存后重跑：ASR / 合并命中缓存；人工词库也会交给 pre-pass 和中日双语的日文校正，所以这两步和翻译重新运行。</div>
         <button class="saveGloss">保存</button>
         <button class="accent saveRerun">保存并重翻</button>
       </div>
@@ -252,6 +263,11 @@
     <div><h2 class="srtTitle">字幕预览</h2><pre class="srt"></pre></div>
   </div>
 </template>
+
+<dialog class="notes" id="verDlg">
+  <div class="head"><h2 id="verTitle">更新内容</h2><button id="verClose">关闭</button></div>
+  <div id="verBody"></div>
+</dialog>
 
 <div class="toast" id="toast"></div>
 <script src="/static/app.js"></script>

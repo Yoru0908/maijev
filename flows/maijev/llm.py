@@ -102,6 +102,17 @@ def check_model(model: str) -> str:
     return model
 
 
+def check_audio_model(model: str) -> str:
+    """check_model for stages that send audio: only native Gemini takes it."""
+    model = check_model(model)
+    if (_route(model) or ("",))[0] != "gemini":
+        raise ValueError(
+            f"听音频校正日文需要 Gemini 模型和 Gemini 原生接口（GEMINI_AGENT_PLATFORM_API_KEY "
+            f"或 GEMINI_API_KEY），当前为 {model!r}；可用 CORRECT_MODEL 单独指定"
+        )
+    return model
+
+
 def generate(
     prompt: str,
     *,
@@ -109,7 +120,10 @@ def generate(
     model: str | None = None,
     json_mode: bool = True,
     timeout: int | None = None,
+    parts: list[dict] | None = None,
 ) -> LLMResult:
+    """``parts`` are extra Gemini parts (e.g. inlineData audio) sent before
+    the prompt; other backends refuse them instead of silently dropping."""
     # A 1000-line batch is ~30k output tokens: minutes on Gemini Flash, far
     # longer on slower models, so the default leaves plenty of headroom.
     timeout = timeout or int(os.environ.get("LLM_TIMEOUT", "1800"))
@@ -118,6 +132,8 @@ def generate(
     if not route:
         raise RuntimeError(f"No API key configured for LLM model {model!r}")
     kind, base, key = route
+    if parts and kind != "gemini":
+        raise RuntimeError(f"{model!r} via {base}: only native Gemini accepts audio")
     if kind == "anthropic":
         return _generate_anthropic(prompt, system=system, model=model,
                                    timeout=timeout, base_url=base, api_key=key)
@@ -129,7 +145,7 @@ def generate(
                                 base_url=base, api_key=key)
 
     body: dict[str, Any] = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": [{"role": "user", "parts": [*(parts or []), {"text": prompt}]}],
         "generationConfig": {
             "maxOutputTokens": int(
                 os.environ.get("LLM_MAX_OUTPUT_TOKENS", "65536")
