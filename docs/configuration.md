@@ -33,6 +33,7 @@ export GEMINI_AGENT_PLATFORM_API_KEY=AQ...
 | `SEGMENT_MODEL` | merge 阶段模型覆盖值 |
 | `TRANSLATE_MODEL` | translation 阶段模型覆盖值 |
 | `PREPASS_MODEL` | pre-pass（词库生成）阶段模型覆盖值 |
+| `PREPASS_PROMPT_PATH` | 可选：用仓库外的 pre-pass prompt 代替 `prepass_prompt.md`（输出须是同一 JSON 结构） |
 | `LLM_THINKING_LEVEL` | 3.x 模型的 `thinkingConfig.thinkingLevel`（`LOW`/`MEDIUM`/`HIGH`；2.x 用 `thinkingBudget`，字段不同） |
 | `LLM_MAX_OUTPUT_TOKENS` | LLM 最大输出 token，默认 `65536` |
 | `LLM_TIMEOUT` | 单次 LLM 请求超时秒数，默认 `1800` |

@@ -36,7 +36,7 @@ work_dir/
 
 - `chunks/*.wav.json` 存在时，不重复调用对应的 ASR 请求。
 - `merge_cache/` 按 atom 内容 + system prompt + model hash 缓存合并结果。
-- `zh_cache/` 按字幕行内容 + system prompt（含两份术语表）+ model hash 缓存
+- `zh_cache/` 按字幕行内容 + system prompt（含合并后的术语表）+ model hash 缓存
   翻译结果。
 - `prepass_cache/` 按 OCR anchor + 日文行 + system prompt + model hash 缓存。
 - prompt、模型或词库变更都会使对应缓存自动失效，无需手动删除。
@@ -92,8 +92,10 @@ ASR 对 429、500、502、503、504 等临时错误自动退避重试，成功�
 （`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`）。
 
 随后 `prepass.run_prepass()` 把 anchor 与 merge 产出的全部日文行一起发给
-Gemini 做**一次共享的纯文本调用**，产出 `glossary.md` 自动词库
-（`原文 -> 写法`，与 `TRANSLATE_GLOSSARY_PATH` 同格式）。anchor 来源可以是：
+Gemini 做**一次共享的纯文本调用**，产出一句话主题和 `glossary.md` 自动词库
+（每个实体一行 `[类别] 原文 / 变体 -> 译名`，与 `TRANSLATE_GLOSSARY_PATH` 同语法；
+人工词库作为静态词库一并传入）。翻译前 `glossary.py` 把自动、基础、人工三层按实体
+合并成一张表（人工优先），翻译后强制替换人工条目中残留的假名原文。anchor 来源可以是：
 
 - Jev 筛出的 OCR 实体（有凭据时）；
 - 未筛选的 OCR 原文（无 Jev 凭据时）；

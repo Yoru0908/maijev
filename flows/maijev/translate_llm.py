@@ -18,6 +18,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from . import glossary
 from .llm import generate_json, resolve_model
 from .segment_llm import MergedLine
 
@@ -78,39 +79,19 @@ OUTPUT_CONTRACT = """
 
 
 def _load_system(glossary_path: Path | None = None) -> str:
+    return _system_for(glossary.load(glossary_path))
+
+
+def _system_for(table: glossary.Table) -> str:
+    """Style prompt + the merged glossary (one answer per entity) + contract."""
     parts = []
     if PROMPT_PATH.exists():
         style = PROMPT_PATH.read_text(encoding="utf-8").strip()
         if style:
             parts.append(style)
-
-    glossary_parts = []
-    base_path = os.environ.get("TRANSLATE_BASE_GLOSSARY_PATH")
-    if base_path:
-        base = Path(base_path).read_text(encoding="utf-8").strip()
-        if base:
-            glossary_parts.append("【基础词库（原词库与官方作品补充）】\n" + base)
-    if glossary_path and glossary_path.exists():
-        auto = glossary_path.read_text(encoding="utf-8").strip()
-        if auto:
-            glossary_parts.append(
-                "【自动术语表（OCR + pre-pass 生成）】\n" + auto
-            )
-    external_path = os.environ.get("TRANSLATE_GLOSSARY_PATH")
-    if external_path:
-        external = Path(external_path).read_text(encoding="utf-8").strip()
-        if external:
-            glossary_parts.append(
-                "【外部术语表（人工确认；与上方条目冲突时以此为准）】\n"
-                + external
-            )
-    if glossary_parts:
-        parts.append(
-            "\n【术语表】\n"
-            "以下内容只作为实体写法与译法的一致性参考，不改变输入 id、"
-            "行数和 JSON 格式：\n" + "\n\n".join(glossary_parts)
-        )
-
+    block = glossary.render(table)
+    if block:
+        parts.append("\n" + block)
     parts.append(OUTPUT_CONTRACT)
     return "\n".join(parts)
 
@@ -186,7 +167,8 @@ def translate_lines_with_heads(
     glossary_path: Path | None = None,
 ) -> tuple[list[str | None], list[str]]:
     """Translate and return each line's verified omitted head (or "")."""
-    system = _load_system(glossary_path)
+    table = glossary.load(glossary_path)
+    system = _system_for(table)
     model = resolve_model("TRANSLATE_MODEL")
     translations: dict[int, dict | str] = {}
     if cache_dir:
@@ -247,7 +229,19 @@ def translate_lines_with_heads(
         translations.update(batch)
 
     resolved = [_resolve(lines[i], translations[i]) for i in range(len(lines))]
-    return [zh for zh, _ in resolved], [head for _, head in resolved]
+    # Whatever batch slipped, a human glossary key left in kana is replaced
+    # here, so every batch ends with the same rendering.
+    rules = glossary.enforcement(table)
+    zh: list[str | None] = []
+    replaced = 0
+    for text, _ in resolved:
+        if text is not None:
+            text, hits = glossary.enforce(text, rules)
+            replaced += hits
+        zh.append(text)
+    if replaced:
+        logger.info(f"glossary: replaced {replaced} untranslated manual keys in zh")
+    return zh, [head for _, head in resolved]
 
 
 

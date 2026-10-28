@@ -1,11 +1,12 @@
-"""Text-only pre-pass: JEV-filtered OCR anchors + merged JA lines -> glossary.
+"""Text-only pre-pass: static glossary + OCR anchors + merged JA lines -> glossary.
 
 One shared LLM call replaces the per-batch pre-analysis that the sakamichi
 prompt did inside every translate batch: entities are resolved once for the
-whole video and injected into every translate batch as a ``原文 -> 写法``
-glossary. Images and audio are never sent — OCR text is the authoritative
-source for kanji spellings, and the merged subtitle lines supply context for
-entities that never appeared on screen.
+whole video — variants grouped, Chinese rendering decided — and injected into
+every translate batch as one ``[kind] 原文 / 变体 -> 译名`` row per entity.
+Images and audio are never sent — OCR text is the authoritative source for
+kanji spellings, and the merged subtitle lines supply context for entities
+that never appeared on screen.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from typing import Any
 
 from loguru import logger
 
+from . import glossary
 from .jev import ContextItem, select_anchors
 from .llm import generate_json, resolve_model
 from .segment_llm import MergedLine
@@ -26,7 +28,9 @@ PROMPT_PATH = Path(__file__).parent / "prepass_prompt.md"
 
 
 def _load_system() -> str:
-    return PROMPT_PATH.read_text(encoding="utf-8")
+    """PREPASS_PROMPT_PATH swaps in a private prompt; the repo one is generic."""
+    path = os.environ.get("PREPASS_PROMPT_PATH") or PROMPT_PATH
+    return Path(path).read_text(encoding="utf-8")
 
 
 def build_anchors(
@@ -59,29 +63,35 @@ def build_anchors(
 
 
 def render_glossary(result: dict[str, Any]) -> str:
-    """Render pre-pass entities as ``原文 -> 写法`` lines.
+    """Render pre-pass output as glossary.md: a theme line + one row per entity.
 
-    Every variant gets its own line pointing at the same canonical form, so
-    translate batches never have to merge variants themselves. The format is
-    identical to the external ``TRANSLATE_GLOSSARY_PATH`` file.
+    Rows use the glossary.py grammar, ``[kind] ja / 变体 -> tgt  # note``;
+    the note is for people reading the file and never reaches the translate
+    prompt. The older ``src``/``canonical`` shape is still read.
     """
+    if not isinstance(result, dict):
+        return ""
     lines: list[str] = []
-    seen: set[str] = set()
-    entries = result.get("entities") if isinstance(result, dict) else None
-    for entry in entries or []:
+    theme = " ".join(str(result.get("theme") or "").split()).replace("->", "→")
+    if theme:
+        lines.append(f"【本片主题】{theme}")
+    for entry in result.get("entities") or []:
         if not isinstance(entry, dict):
             continue
-        canonical = str(entry.get("canonical") or "").strip()
-        if not canonical:
+        ja = str(entry.get("ja") or entry.get("canonical") or "").strip()
+        tgt = str(entry.get("tgt") or ja).strip()
+        variants = entry.get("variants") or entry.get("src") or []
+        if isinstance(variants, str):
+            variants = [variants]
+        keys = list(dict.fromkeys(
+            s for s in (str(v).strip() for v in [ja, *variants]) if s
+        ))
+        if not tgt or not keys:
             continue
-        for src in entry.get("src") or []:
-            src = str(src).strip()
-            if not src:
-                continue
-            line = f"{src} -> {canonical}"
-            if line not in seen:
-                seen.add(line)
-                lines.append(line)
+        note = " ".join(str(entry.get("note") or "").split())
+        lines.append(
+            glossary.format_row(str(entry.get("kind") or ""), keys, tgt, note)
+        )
     return "\n".join(lines)
 
 
@@ -99,14 +109,21 @@ def run_prepass(
     ``results=None`` means JEV never ran and ``items`` are raw OCR text.
     ``extra_anchors`` are pre-classified anchors (e.g. cast names from the
     video source metadata) injected verbatim, bypassing JEV filtering.
-    The cache key covers all inputs (anchors + subtitle lines) plus system
-    prompt and model, so any change invalidates the cache automatically.
+    The human glossaries (.env base + manual) go in as the static appendix,
+    so the pre-pass reuses their spellings instead of inventing new ones.
+    The cache key covers all inputs (glossaries + anchors + subtitle lines)
+    plus system prompt and model, so any change invalidates it automatically.
     """
     anchors = build_anchors(items, results) + list(extra_anchors or [])
     system = _load_system()
     model = os.environ.get("PREPASS_MODEL") or resolve_model("TRANSLATE_MODEL")
+    static = "\n\n".join(
+        text.strip() for text in glossary.human_layers() if text.strip()
+    )
     body = (
-        "【画面文字】\n"
+        "【附录：静态词库】\n"
+        + (static or "（无）")
+        + "\n\n【画面文字】\n"
         + json.dumps(anchors, ensure_ascii=False, indent=1)
         + "\n\n【日文字幕行】\n"
         + "\n".join(f"{i}\t{line.text}" for i, line in enumerate(lines))
@@ -125,13 +142,13 @@ def run_prepass(
                 json.dumps(result, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-    glossary = render_glossary(result)
+    text = render_glossary(result)
     review_n = (
         len(result.get("review") or []) if isinstance(result, dict) else 0
     )
     logger.info(
         f"pre-pass: {len(anchors)} anchors + {len(lines)} lines -> "
-        f"{len(glossary.splitlines()) if glossary else 0} glossary rows, "
+        f"{sum('->' in row for row in text.splitlines())} entities, "
         f"{review_n} review items"
     )
-    return glossary
+    return text

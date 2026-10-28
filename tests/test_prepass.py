@@ -56,30 +56,35 @@ def test_build_anchors_serializes_timing():
     }]
 
 
-def test_render_glossary_expands_variants_to_canonical():
+def test_render_glossary_writes_one_row_per_entity():
     result = {
+        "theme": "测试  节目 -> 主题",
         "entities": [
+            {
+                "kind": "person",
+                "ja": "野比のび太",
+                "variants": ["のび太", "ノビ君", "のび太"],
+                "tgt": "大雄",
+                "note": "主角",
+            },
+            # kept as written: still a decision the translator needs
+            {"kind": "program", "ja": "スペースウォーズ", "tgt": "スペースウォーズ"},
+            # the older src/canonical shape still renders
             {
                 "src": ["中川智尋", "中川智导", "中 智"],
                 "canonical": "中川智尋",
                 "kind": "person_name",
             },
-            {
-                "src": ["そこ曲がったら、櫻坂？"],
-                "canonical": "そこ曲がったら、櫻坂？",
-                "kind": "program_title",
-            },
-            {"src": ["空条目"], "canonical": "", "kind": "unknown"},
+            {"ja": "", "tgt": ""},
             "not-a-dict",
         ],
         "review": [{"src": "謎", "reason": "blur"}],
     }
-    glossary = render_glossary(result)
-    assert glossary.splitlines() == [
-        "中川智尋 -> 中川智尋",
-        "中川智导 -> 中川智尋",
-        "中 智 -> 中川智尋",
-        "そこ曲がったら、櫻坂？ -> そこ曲がったら、櫻坂？",
+    assert render_glossary(result).splitlines() == [
+        "【本片主题】测试 节目 → 主题",
+        "[人名] 野比のび太 / のび太 / ノビ君 -> 大雄  # 主角",
+        "[节目] スペースウォーズ -> スペースウォーズ",
+        "[人名] 中川智尋 / 中川智导 / 中 智 -> 中川智尋",
     ]
 
 
@@ -95,3 +100,32 @@ def test_clean_zh_strips_banned_chars():
     assert _clean_zh(" -山川宇衣你对家乡也") == "山川宇衣你对家乡也"
     # punctuation rules: mid-sentence comma -> space, quotes -> 「」
     assert _clean_zh("他说，“你好”。") == "他说 「你好」"
+
+
+def test_prepass_reads_private_prompt_and_human_glossaries(monkeypatch, tmp_path):
+    import flows.maijev.prepass as prepass
+    from flows.maijev.segment_llm import MergedLine
+
+    prompt, manual = tmp_path / "private.md", tmp_path / "manual.md"
+    prompt.write_text("私有预分析 prompt", encoding="utf-8")
+    manual.write_text("オールナイトニッポン0 -> ANN0", encoding="utf-8")
+    monkeypatch.setenv("PREPASS_PROMPT_PATH", str(prompt))
+    monkeypatch.setenv("TRANSLATE_GLOSSARY_PATH", str(manual))
+    monkeypatch.delenv("TRANSLATE_BASE_GLOSSARY_PATH", raising=False)
+    monkeypatch.setattr(prepass, "resolve_model", lambda _: "m")
+    seen = {}
+
+    def fake_generate(body, **kwargs):
+        seen.update(body=body, system=kwargs["system"])
+        return {"theme": "深夜电台", "entities": [{
+            "kind": "program", "ja": "オールナイトニッポン0",
+            "variants": ["オールナイトニッポンゼロ"], "tgt": "ANN0"}]}
+
+    monkeypatch.setattr(prepass, "generate_json", fake_generate)
+    text = prepass.run_prepass([], None, [MergedLine(0, 1, "こんばんは", [0])])
+    assert seen["system"] == "私有预分析 prompt"
+    assert seen["body"].startswith("【附录：静态词库】\nオールナイトニッポン0 -> ANN0\n")
+    assert text.splitlines() == [
+        "【本片主题】深夜电台",
+        "[节目] オールナイトニッポン0 / オールナイトニッポンゼロ -> ANN0",
+    ]
