@@ -10,7 +10,7 @@
 
 **基础流程只需 MAI + LLM，OCR 和 Jev 都不是必需项。** “无需修改时间轴”仅指收音良好、语音清晰素材下的使用体验，不代表所有视频都能免调轴；文字、翻译和专有名词仍需人工校对。
 
-[快速开始](#快速开始) · [命令行](#命令行) · [Agent Skill](#agent-skill) · [效果示例](#效果示例) · [详细文档](#详细文档)
+[快速开始](#快速开始) · [命令行](#命令行) · [中日双语](#中日双语听音频校正日文) · [Agent Skill](#agent-skill) · [效果示例](#效果示例) · [详细文档](#详细文档) · [更新内容](CHANGELOG.md)
 
 ## 快速开始
 
@@ -68,7 +68,7 @@ uv run python -m flows.maijev.gui
 
 常用的人名、昵称、符号写法，在「开始」前的「人工词库」里填写内容和「词库名」，点「保存」（存在本地 `glossaries/<名字>.md`，不提交；不用的可以删除），之后每个新任务直接选，第一遍翻译就会用上。只针对某个任务的修正，在右侧「本任务人工词库」填写 `原文 -> 写法`，点击「保存并重翻」；同一原文以本任务为准。任务和缓存默认保存在 `runs/`；每个素材应使用独立工作目录。
 
-翻译会酌情省略开头的「えっと」「なんか」等语气词，中文字幕的开始时间随之后移到第一个保留的词；整行只有语气词（如单独的「はい。」附和）时，中文字幕不出这一条，双语字幕只显示日文。回答提问的「はい」照常翻译。日文 `out_llm_ja.srt` 不受影响。
+maijev 面向字幕组，口语填充默认清理：翻译会酌情省略开头的「えっと」「なんか」等语气词和口癖，中文字幕的开始时间随之后移到第一个保留的词；整行只有语气词（如单独的「はい。」附和）时，中文字幕不出这一条，双语字幕只显示日文。回答提问的「はい」照常翻译。日文 `out_llm_ja.srt` 不受影响。
 
 左上角的版本号点开是[更新内容](CHANGELOG.md)，有新版本时会标「新」；报问题时请附上版本号。GUI 的服务器模式与访问说明见 [进阶使用](docs/usage.md#web-gui可选)。
 
@@ -83,11 +83,11 @@ uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --llm-segment
 # 日文和中文字幕；自动包含语义合并
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate
 
-# 再加中日双语：翻译前 Gemini 先听音频校正日文（需要 Gemini 原生接口）
-uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass --bilingual
-
 # 翻译前用全片字幕生成共享词库，不需要 OCR
 uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass
+
+# 再加中日双语：翻译前 Gemini 先听音频校正日文（需要 Gemini 原生接口）
+uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --prepass --bilingual
 ```
 
 | 工作目录中的输出 | 内容 |
@@ -103,6 +103,22 @@ uv run python -m flows.maijev.pipeline "input.mp4" "runs/demo" --translate --pre
 ```bash
 uv run python -m flows.maijev.pipeline --help
 ```
+
+## 中日双语：听音频校正日文
+
+ASR 听错的日文（人名、昵称、近音词）只看文字很难确认：翻译模型能按上下文猜出正确的中文，
+双语字幕里的日文却还是错的。所以中日双语是单独的选项（GUI 勾选「中日双语」，CLI `--bilingual`，
+默认不开）：在自动词库之后、翻译之前，让 Gemini 按字幕行听对应的音频，只改听错的行，
+不增删行、不动时间轴；日文、中文、双语字幕都基于校正后的日文。
+
+- 每处修改记在 `ja_corrections.json`（时间、原文、改后、理由），交付前请对照音频抽听。
+  模型「听」出的写法会受词库影响：词库里有说话人的名字和昵称时更容易听对，没有时可能
+  改成别的近音词。常用人名、昵称请先写进人工词库。
+- 只支持 Gemini 原生接口（`GEMINI_AGENT_PLATFORM_API_KEY` 或 `GEMINI_API_KEY`），中转和
+  OpenRouter 不能发送音频；`CORRECT_MODEL` 可单独指定校正模型。
+- 某段校正失败时照常输出日文和中文字幕，但不输出双语，任务以错误结束；重跑只重试失败的段。
+
+细节见 [进阶使用](docs/usage.md#中日双语听音频校正日文)。
 
 ## Agent Skill
 
@@ -121,7 +137,7 @@ Skill 是操作指引，不会自动安装 maijev 或复制 API 密钥。
 ![待校对的烧录样例：画面人名条为「夫 啓治さん」，底部字幕仍写作「庆次」](docs/assets/demo-frame-name-card.png)
 
 上图展示了一个需要校对的同音异字问题：人名条是「夫 啓治さん」，字幕却写成了「庆次」。
-[OCR 人名对照测试](docs/ocr-name-comparison.md)复用相同转录和全片上下文：未接入 OCR 时词库写作「目黒慶次」，接入后变为「目黒啓治」，译文随之采用「啓治」。这是一次具体测试，不保证所有人名都能自动纠正，也不修改 ASR 日文原文。
+[OCR 人名对照测试](docs/ocr-name-comparison.md)复用相同转录和全片上下文：未接入 OCR 时词库写作「目黒慶次」，接入后变为「目黒啓治」，译文随之采用「啓治」。这是一次具体测试，不保证所有人名都能自动纠正。OCR 只影响词库和译文，不改日文原文；要改日文原文用[中日双语的听音频校正](#中日双语听音频校正日文)。
 
 ## 工作原理
 
@@ -145,6 +161,7 @@ atom 是带时间的小片段，可以包含多个词。LLM 返回分组或翻�
 
 费用由 MAI 转录和各 LLM 阶段共同构成，受素材、模型、缓存和重试次数影响。
 历史记录中，26.5 分钟素材使用 Gemini 2.5 Pro，ASR 为 $0.044，LLM 约 $0.2（估算，未逐项记录完整账单）；详见 [费用记录](docs/costs.md)。
+勾选中日双语时多一次听音频的调用：Gemini 按约 32 token/秒计音频，1 小时音频约 11.5 万输入 token，另加字幕文字。
 
 ## 详细文档
 
@@ -154,3 +171,5 @@ atom 是带时间的小片段，可以包含多个词。LLM 返回分组或翻�
 | 远程视频、OCR、词库、GUI 服务器模式、故障排查 | [进阶使用](docs/usage.md) |
 | atom、LLM 契约、缓存与目录结构 | [流水线实现与缓存](docs/architecture.md) |
 | 修改 prompt、运行测试和提交代码 | [开发与 Prompt 实验](docs/development.md) |
+| 中日双语的听音频校正 | [进阶使用 · 中日双语](docs/usage.md#中日双语听音频校正日文) |
+| 每个版本改了什么 | [更新内容](CHANGELOG.md) |
