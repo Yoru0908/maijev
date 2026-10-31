@@ -1,6 +1,6 @@
 [project]
 name = "maijev"
-version = "0.2.0"
+version = "0.2.1"
 description = "MAI-Transcribe-2 ASR pipeline: transcribe → atomize → LLM merge → translate"
 requires-python = ">=3.13"
 dependencies = [
