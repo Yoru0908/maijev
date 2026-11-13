@@ -28,13 +28,15 @@ uv sync --extra gui
 
 ### 2. 配置 API
 
-基础流程只需要两个 key：
+基础流程只需要两个 key（前两行）；后面几行是可选的 LLM 替代方案，不用填：
 
 | 用途 | 去哪里申请 | 填到 `.env` |
 |---|---|---|
 | 听写（MAI-Transcribe 2） | [OpenRouter → Keys](https://openrouter.ai/settings/keys)，先在 [Credits](https://openrouter.ai/settings/credits) 充一点余额 | `OPENROUTER_API_KEY` |
 | 断句和翻译（Gemini，推荐） | [Google Cloud 免费试用](https://cloud.google.com/free) 开通后，在 [Vertex AI 快速模式](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys) 拿 API key，之后在 [凭据页](https://console.cloud.google.com/apis/credentials) 管理 | `GEMINI_AGENT_PLATFORM_API_KEY` |
 | 断句和翻译（另一种方式） | [Google AI Studio → API key](https://aistudio.google.com/apikey) | `GEMINI_API_KEY` |
+| 断句和翻译（Claude / GPT，未测试） | [Anthropic Console](https://console.anthropic.com/settings/keys) / [OpenAI Platform](https://platform.openai.com/api-keys)；`ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` 可改成自己的地址 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
+| 断句和翻译（第三方 OpenAI 格式 API，未测试） | 任何兼容 `chat/completions` 的服务（DeepSeek、通义、中转站、自建 vLLM / Ollama 等）；模型写成 `relay:<模型名>` | `LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY` |
 
 ```dotenv
 OPENROUTER_API_KEY=填写你的_OpenRouter_密钥
