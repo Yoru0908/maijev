@@ -49,7 +49,27 @@ OCR 筛选用的 Jev 是可选项，不填也能跑完整流程。需要时在 [
 
 `.env` 不应提交到仓库。其他 LLM 接入方式、模型覆盖和可选 Jev 凭据见 [API 与模型配置](docs/configuration.md)。
 
-断句、自动词库和翻译推荐并默认使用 `gemini-3.8-flash`，也可选 `gemini-4-argon`、`gemini-3.1-pro-preview`（Argon 需要 global 端点，见 [配置](docs/configuration.md)）。Claude（Sonnet 5.5 / Opus 5.5 / Fable 5.1）和 GPT-6.1 Sol 也能用，可走原生 API、OpenAI 兼容中转站或 OpenRouter，但**没有测试过，效果自负**，见 [Claude / GPT](docs/configuration.md#claude--gpt未测试效果自负)。其他 OpenAI 格式的第三方 API（DeepSeek、通义、自建 vLLM / Ollama 等）设 `LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY`，模型写成 `relay:<模型名>`（如 `TRANSLATE_MODEL=relay:deepseek-chat`），同样未测试，见 [第三方 OpenAI 格式 API](docs/configuration.md#第三方-openai-格式-api任意模型名)。GUI 下拉框使用固定模型选项，自定义模型在 `.env` 里设置；其他不在白名单、也没有 `relay:` 前缀的模型值会在开始下载或听写前报错。
+#### 选哪个模型
+
+断句、自动词库和翻译共用同一套模型设置，默认 `gemini-3.8-flash`：
+
+| 想用 | 模型写法 | 后端与 key | 状态 |
+|---|---|---|---|
+| Gemini（推荐） | `gemini-3.8-flash`（默认）、`gemini-4-argon`、`gemini-3.1-pro-preview` | Vertex / AI Studio（Argon 需要 global 端点，见[配置](docs/configuration.md)） | 已测试 |
+| Claude | `claude-sonnet-5-5`、`claude-opus-5-5`、`claude-fable-5-1` | `ANTHROPIC_API_KEY`，没有就依次回落到中转站、OpenRouter | 未测试 |
+| GPT | `gpt-6.1-sol` | `OPENAI_API_KEY`，没有就依次回落到中转站、OpenRouter | 未测试 |
+| 其他 OpenAI 格式 API | `relay:<模型名>`，如 `relay:deepseek-chat` | 只走 `LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY` | 未测试 |
+
+第三方 API 的 `.env` 示例：
+
+```dotenv
+LLM_RELAY_BASE_URL=https://api.deepseek.com/v1
+LLM_RELAY_API_KEY=填写你的密钥
+TRANSLATE_MODEL=relay:deepseek-chat
+# LLM_RELAY_JSON_MODE=0   # 服务不支持 response_format 时取消注释
+```
+
+“未测试”表示 prompt、批次大小和超时都按 Gemini 3.8 Flash 调过，其他模型效果自负。GUI 下拉框只有固定选项，自定义模型在 `.env` 里设置，GUI 选“使用默认模型”即可。不在白名单、也没有 `relay:` 前缀的模型值会在下载或听写前报错。细节见 [Claude / GPT](docs/configuration.md#claude--gpt未测试效果自负) 和 [第三方 OpenAI 格式 API](docs/configuration.md#第三方-openai-格式-api任意模型名)。
 
 ### 3. 启动 GUI
 
