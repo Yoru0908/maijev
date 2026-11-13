@@ -355,8 +355,9 @@ def main() -> None:
         "--model",
         default=None,
         type=validate_model,
-        choices=SUPPORTED_MODELS,
-        help="model for all LLM stages (same as GEMINI_MODEL; "
+        metavar="MODEL",
+        help="model for all LLM stages: " + " / ".join(SUPPORTED_MODELS)
+        + " / relay:<any id on LLM_RELAY_*> (same as GEMINI_MODEL; "
         "per-stage overrides: SEGMENT_MODEL / TRANSLATE_MODEL / PREPASS_MODEL)",
     )
     for stage in ("segment", "translate"):
@@ -364,7 +365,7 @@ def main() -> None:
             f"--{stage}-model",
             default=None,
             type=validate_model,
-            choices=SUPPORTED_MODELS,
+            metavar="MODEL",
             help=f"model for the {stage} stage only; overrides "
             f"{stage.upper()}_MODEL from .env",
         )

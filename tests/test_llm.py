@@ -15,7 +15,7 @@ import flows.maijev.llm as llm  # noqa: E402
 
 KEYS = ("GEMINI_AGENT_PLATFORM_API_KEY", "AGENT_PLATFORM_API_KEY", "GEMINI_API_KEY",
         "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL",
-        "LLM_RELAY_BASE_URL", "LLM_RELAY_API_KEY", "OPENROUTER_API_KEY", "GEMINI_MODEL")
+        "LLM_RELAY_BASE_URL", "LLM_RELAY_API_KEY", "LLM_RELAY_JSON_MODE", "OPENROUTER_API_KEY", "GEMINI_MODEL")
 
 
 @pytest.fixture
@@ -180,3 +180,42 @@ def test_audio_parts_go_to_native_gemini_only(monkeypatch, sent):
     with pytest.raises(ValueError, match="Gemini 原生接口"):
         llm.check_audio_model("gemini-3.8-flash")
     assert len(sent) == 1
+
+
+def test_relay_prefix_sends_any_model_id_verbatim(monkeypatch, sent):
+    monkeypatch.setenv("LLM_RELAY_BASE_URL", "https://relay.example/v1")
+    monkeypatch.setenv("LLM_RELAY_API_KEY", "r")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or")
+    assert llm.validate_model("relay:deepseek-chat") == "relay:deepseek-chat"
+    assert llm.generate_json("p", model="relay:deepseek-chat") == {"ok": 1}
+    [c] = sent
+    assert c["url"] == "https://relay.example/v1/chat/completions"
+    assert c["body"]["model"] == "deepseek-chat"
+    assert c["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_relay_prefix_never_falls_back_to_openrouter(monkeypatch, sent):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or")
+    with pytest.raises(ValueError, match="No API key"):
+        llm.check_model("relay:deepseek-chat")
+    assert sent == []
+
+
+def test_relay_prefix_needs_a_model_id():
+    with pytest.raises(ValueError, match="empty model id"):
+        llm.validate_model("relay:")
+
+
+def test_relay_json_mode_can_be_disabled(monkeypatch, sent):
+    monkeypatch.setenv("LLM_RELAY_BASE_URL", "https://relay.example/v1")
+    monkeypatch.setenv("LLM_RELAY_API_KEY", "r")
+    monkeypatch.setenv("LLM_RELAY_JSON_MODE", "0")
+    llm.generate_json("p", model="relay:qwen-max")
+    assert "response_format" not in sent[0]["body"]
+
+
+def test_relay_prefix_cannot_take_audio(monkeypatch):
+    monkeypatch.setenv("LLM_RELAY_BASE_URL", "https://relay.example/v1")
+    monkeypatch.setenv("LLM_RELAY_API_KEY", "r")
+    with pytest.raises(ValueError, match="Gemini"):
+        llm.check_audio_model("relay:gemini-3.8-flash")

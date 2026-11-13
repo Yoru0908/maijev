@@ -8,6 +8,8 @@ relay, then OpenRouter:
   - claude-*: ANTHROPIC_API_KEY → {ANTHROPIC_BASE_URL}/v1/messages
   - gpt-*: OPENAI_API_KEY → {OPENAI_BASE_URL}/chat/completions
   - LLM_RELAY_BASE_URL + LLM_RELAY_API_KEY → relay chat/completions
+  - relay:<any-model-id>: any model name served by the OpenAI-format relay,
+    sent verbatim (no whitelist); LLM_RELAY_JSON_MODE=0 drops response_format
   - OPENROUTER_API_KEY → OpenRouter chat/completions
 OPENROUTER_API_KEY is also the ASR key, so it is always the last resort.
 """
@@ -41,8 +43,17 @@ ANTHROPIC_URL = "https://api.anthropic.com"
 OPENAI_URL = "https://api.openai.com/v1"
 
 
+RELAY_PREFIX = "relay:"
+
+
 def validate_model(model: str) -> str:
-    """Reject stale overrides before they can send a paid model request."""
+    """Reject stale overrides before they can send a paid model request.
+
+    ``relay:<id>`` is the explicit opt-out: any id the relay serves."""
+    if model.startswith(RELAY_PREFIX):
+        if not model[len(RELAY_PREFIX):].strip():
+            raise ValueError(f"{model!r}: empty model id after 'relay:'")
+        return model
     normalized = OPENROUTER_IDS.get(model, model.removeprefix("google/"))
     if normalized not in SUPPORTED_MODELS:
         raise ValueError(
@@ -78,6 +89,10 @@ def _post(url: str, body: dict, timeout: int = 600) -> dict:
 def _route(model: str) -> tuple[str, str, str] | None:
     """(kind, base_url, key) of the first configured backend for model."""
     env = os.environ.get
+    if model.startswith(RELAY_PREFIX):
+        if env("LLM_RELAY_BASE_URL") and env("LLM_RELAY_API_KEY"):
+            return ("openai", env("LLM_RELAY_BASE_URL"), env("LLM_RELAY_API_KEY"))
+        return None
     if model.startswith("gemini-"):
         if env("GEMINI_AGENT_PLATFORM_API_KEY") or env("AGENT_PLATFORM_API_KEY") \
                 or env("GEMINI_API_KEY"):
@@ -138,8 +153,13 @@ def generate(
         return _generate_anthropic(prompt, system=system, model=model,
                                    timeout=timeout, base_url=base, api_key=key)
     if kind == "openai":
-        if base == OPENROUTER_URL:
+        if model.startswith(RELAY_PREFIX):
+            model = model[len(RELAY_PREFIX):].strip()
+        elif base == OPENROUTER_URL:
             model = MODELS[model]
+        if base == os.environ.get("LLM_RELAY_BASE_URL") \
+                and os.environ.get("LLM_RELAY_JSON_MODE", "1") == "0":
+            json_mode = False
         return _generate_openai(prompt, system=system, model=model,
                                 json_mode=json_mode, timeout=timeout,
                                 base_url=base, api_key=key)

@@ -79,6 +79,23 @@ export GEMINI_AGENT_PLATFORM_BASE_URL=https://aiplatform.googleapis.com/v1beta1/
 ASR 本来就要 `OPENROUTER_API_KEY`，所以不配其他 key 时 Claude / GPT 直接走 OpenRouter。
 `LLM_THINKING_LEVEL` 只对 Gemini 生效。较慢的模型一批可能要十几分钟，单次请求默认最多等 30 分钟（`LLM_TIMEOUT`）；仍然超时就调小 `SEGMENT_BATCH_SIZE` / `TRANSLATE_BATCH_SIZE`。一个模型找不到任何后端时，在下载 / 听写前报错。
 
+### 第三方 OpenAI 格式 API（任意模型名）
+
+白名单之外的模型（DeepSeek、通义、自建 vLLM / Ollama 等）用 `relay:` 前缀，走
+`LLM_RELAY_BASE_URL` + `LLM_RELAY_API_KEY`，前缀后的名字原样发给中转站：
+
+```bash
+export LLM_RELAY_BASE_URL=https://api.deepseek.com/v1
+export LLM_RELAY_API_KEY=sk-...
+export TRANSLATE_MODEL=relay:deepseek-chat     # 或 CLI --translate-model relay:deepseek-chat
+# 中转站不支持 response_format 时关掉（输出里的 JSON 仍会被容错提取）
+export LLM_RELAY_JSON_MODE=0
+```
+
+`relay:` 模型只会走中转站，不会回落到 OpenRouter；没配中转站时在下载 / 听写前报错。
+不能用于日文校正（要音频，只有 Gemini 原生接口）。GUI 下拉框不含自定义模型：在 `.env`
+里设 `SEGMENT_MODEL` / `TRANSLATE_MODEL`，GUI 选「使用默认模型」即可。这类模型同样未测试。
+
 想用 ChatGPT / Claude 订阅登录的反代（如 CLIProxyAPI）的，自己架好后填成中转站即可；
 这类用法可能违反服务商条款，项目不内置。
 
