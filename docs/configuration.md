@@ -127,17 +127,15 @@ Jev OCR 上下文（可选；仅 `--ocr-json` 时用到），两个后端任选�
 `--ocr-json` 仍可用：跳过 JEV 分类，OCR 原始文字直接进 pre-pass。同理
 `--prepass` 可在没有任何 OCR 时单独运行。
 
-LLM 后端选择顺序：
+LLM 后端选择顺序（每个模型取第一个配置好的）：
 
 ```text
-GEMINI_AGENT_PLATFORM_API_KEY / AGENT_PLATFORM_API_KEY
-  → Vertex AI Agent Platform
-
-GEMINI_API_KEY
-  → Google AI Studio
-
-OPENROUTER_API_KEY
-  → 仅在没有 Gemini 配置时作为 LLM fallback
+gemini-*   → Vertex（GEMINI_AGENT_PLATFORM_API_KEY / AGENT_PLATFORM_API_KEY）
+             → AI Studio（GEMINI_API_KEY）
+claude-*   → ANTHROPIC_API_KEY（原生 /v1/messages）
+gpt-*      → OPENAI_API_KEY（chat/completions）
+relay:<id> → 只走 LLM_RELAY_BASE_URL + LLM_RELAY_API_KEY
+以上都没有 → LLM_RELAY_*（白名单模型原生 ID）→ OPENROUTER_API_KEY
 ```
 
 ASR 始终使用 OpenRouter 的 speech-to-text endpoint，与 LLM 后端相互独立。
